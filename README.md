@@ -3,7 +3,6 @@
 [English](README.md) | [中文](README.zh.md)
 
 [![CI](https://github.com/JackWangSIA/dsh-ai-notepad/actions/workflows/ci.yml/badge.svg)](https://github.com/JackWangSIA/dsh-ai-notepad/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/dsh-ai-notepad)](https://www.npmjs.com/package/dsh-ai-notepad)
 
 <p align="center">
   <img src="assets/icon-180.png" width="112" alt="AI Notepad">
@@ -20,17 +19,23 @@ AI Notepad is a DeepSeek Harness plugin that turns the Harness Web UI into a lig
 
 ## Install
 
-From the plugin market (after publishing):
-
-```bash
-dsh plugin --profile web add dsh-ai-notepad
-```
+From the plugin market after the listing is live. The market entry uses the
+version-free GitHub Release tarball, so no npm account is required.
 
 From GitHub:
 
 ```bash
 dsh plugin --profile web add JackWangSIA/dsh-ai-notepad
 ```
+
+A prebuilt tarball is available at:
+
+```text
+https://github.com/JackWangSIA/dsh-ai-notepad/releases/latest/download/dsh-ai-notepad.tgz
+```
+
+If the package is later published to npm, `dsh plugin --profile web add dsh-ai-notepad`
+will also work.
 
 On DSH Desktop, prefer **Plugins → Add plugin** with the repository URL. The `desktop` profile is managed by the app; do not edit it with the CLI by hand.
 

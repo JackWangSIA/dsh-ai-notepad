@@ -3,7 +3,6 @@
 [English](README.md) | 中文
 
 [![CI](https://github.com/JackWangSIA/dsh-ai-notepad/actions/workflows/ci.yml/badge.svg)](https://github.com/JackWangSIA/dsh-ai-notepad/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/dsh-ai-notepad)](https://www.npmjs.com/package/dsh-ai-notepad)
 
 <p align="center">
   <img src="assets/icon-180.png" width="112" alt="AI Notepad">
@@ -98,17 +97,21 @@ AI 只输出选中区域的替换文本；原文件不会被直接修改。修�
 
 ### 从插件市场
 
-发布后可在 DSH 的 **插件 / Discover** 中搜索 `AI Notepad`，或安装 npm 包：
-
-```bash
-dsh plugin --profile web add dsh-ai-notepad
-```
+市场条目上线后，可在 DSH 的 **插件 / Discover** 中搜索 `AI Notepad`。市场条目使用 GitHub Release 的稳定 tarball，不需要 npm 账号。
 
 ### 从 GitHub 安装
 
 ```bash
 dsh plugin --profile web add JackWangSIA/dsh-ai-notepad
 ```
+
+预构建包：
+
+```text
+https://github.com/JackWangSIA/dsh-ai-notepad/releases/latest/download/dsh-ai-notepad.tgz
+```
+
+如果之后发布到 npm，也可以使用 `dsh plugin --profile web add dsh-ai-notepad`。
 
 桌面端建议通过侧栏 **插件 → 添加插件** 使用仓库地址；Desktop profile 由桌面应用管理，不建议直接运行 CLI 修改 `desktop` profile。
 
