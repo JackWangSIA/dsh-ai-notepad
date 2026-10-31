@@ -1,0 +1,4 @@
+node_modules/
+dist/
+test/.render-bundle.mjs
+*.log

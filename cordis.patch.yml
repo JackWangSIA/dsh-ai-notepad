@@ -1,0 +1,6 @@
+# AI Notepad bundle patch for the DeepSeek Harness desktop/web profile.
+# The Host half owns local file I/O, AI calls, Windows associations and the
+# external-open inbox. The Client half owns the editor surface.
+- insert:
+    - id: ai-notepad
+      name: 'dsh-ai-notepad'

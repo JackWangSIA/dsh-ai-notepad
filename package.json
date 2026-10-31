@@ -1,0 +1,92 @@
+{
+  "name": "dsh-ai-notepad",
+  "version": "1.1.8",
+  "description": "AI Notepad for DeepSeek Harness: a lightweight, general-purpose text editor with selection-scoped AI editing, diff review, Markdown preview, and real Windows file associations.",
+  "private": false,
+  "type": "module",
+  "author": "Wang Heran",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JackWangSIA/dsh-ai-notepad.git"
+  },
+  "homepage": "https://github.com/JackWangSIA/dsh-ai-notepad",
+  "bugs": {
+    "url": "https://github.com/JackWangSIA/dsh-ai-notepad/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "notepad",
+    "text-editor",
+    "markdown",
+    "ai",
+    "windows"
+  ],
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "lib/scripts/pick-open.ps1",
+    "lib/scripts/pick-save.ps1",
+    "lib/scripts/fonts.ps1",
+    "lib/scripts/launch.vbs",
+    "locale/*.json",
+    "icon.svg",
+    "assets/*",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md",
+    "CHANGELOG.md",
+    "SECURITY.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout"
+      ]
+    },
+    "env": {
+      "minVersion": "0.2.0-rc.2"
+    }
+  },
+  "dependencies": {
+    "iconv-lite": "0.7.0"
+  },
+  "devDependencies": {
+    "@codemirror/commands": "6.8.1",
+    "@codemirror/language": "6.11.3",
+    "@codemirror/search": "6.5.11",
+    "@codemirror/state": "6.5.2",
+    "@codemirror/view": "6.38.6",
+    "codemirror": "6.0.2",
+    "esbuild": "0.25.10",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/*.test.mjs",
+    "pack": "pnpm pack"
+  },
+  "engines": {
+    "node": ">=24",
+    "dsh": ">=0.2.0-rc.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

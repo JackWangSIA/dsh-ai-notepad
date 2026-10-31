@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "AI Notepad",
+    "description": "A lightweight general-purpose AI text editor with encoding-preserving saves, tabs, Markdown preview, selection/full-document AI edits, diff review, and real Windows file associations."
+  }
+}
