@@ -71,6 +71,7 @@ const MESSAGES = {
     overwrite: '仍然覆盖',
     binary: '这是一个二进制文件，已拒绝打开以保护文件。',
     saved: '已保存',
+    largeFile: '已打开超过 16 MiB 的大文件；渲染、预览和 AI 可能变慢，保存时会占用更多内存。',
     noPath: '新文件还没有路径',
     dirty: '未保存',
     chars: '字符',
@@ -130,7 +131,7 @@ const MESSAGES = {
     featureModelDesc: '无需额外 API Key，沿用当前默认模型',
     limitAssoc: 'Windows 默认应用仍受 UserChoice 哈希保护，注册 Open With 后需要手动选择一次“始终使用”。',
     limitEditor: '预览是快速查看模式；双击预览会回到编辑，不提供完整的 WYSIWYG 富文本编辑。',
-    limitSize: '单文件读取上限 16 MiB；全文 AI 上下文约 120k 字符，超长文档会截断中间上下文。',
+    limitSize: '单文件读取上限 64 MiB（超过 16 MiB 会提示大文件）；全文 AI 上下文约 120k 字符，超长文档会截断中间上下文。',
     aboutUpdateCurrent: '当前版本：Linux/macOS 原生文件选择、HTML 预览与资源重写、非模态 Diff 侧栏、自定义要求隔离、预览选区 AI。',
     aboutUpdatePrev: '此前版本：搜索式字体选择器、Ctrl+滚轮缩放、Markdown 预览、Windows 文件关联与启动器。',
     fontSearch: '搜索字体…',
@@ -247,6 +248,7 @@ const MESSAGES = {
     overwrite: 'Overwrite anyway',
     binary: 'This looks like a binary file. It was not opened.',
     saved: 'Saved',
+    largeFile: 'Opened a file larger than 16 MiB. Rendering, preview and AI may be slower, and saving uses more memory.',
     noPath: 'This new file has no path yet',
     dirty: 'Unsaved',
     chars: 'chars',
@@ -306,7 +308,7 @@ const MESSAGES = {
     featureModelDesc: 'No extra API key; uses the current default model',
     limitAssoc: 'Windows still protects the default-app choice with UserChoice. After registering Open With, choose “Always use” once.',
     limitEditor: 'Preview is a quick reading mode; double-clicking returns to editing, not a full WYSIWYG editor.',
-    limitSize: 'File read limit 16 MiB; document AI context about 120k characters; very long documents omit the middle context.',
+    limitSize: 'File read limit 64 MiB (files over 16 MiB show a large-file warning); document AI context about 120k characters; very long documents omit the middle context.',
     aboutUpdateCurrent: 'Current: Linux/macOS native pickers, HTML preview with asset rewriting, docked diff review, custom-instruction isolation and preview selection AI.',
     aboutUpdatePrev: 'Earlier: searchable font picker, Ctrl+wheel zoom, Markdown preview, Windows associations and launcher.',
     fontSearch: 'Search fonts…',
@@ -712,12 +714,14 @@ export async function openPath(filePath, options = {}) {
       eol: result.eol,
       hash: result.hash,
       size: result.size,
+      large: result.large === true,
       mtimeMs: result.mtimeMs,
       readOnly: result.readOnly,
       dirty: false,
     })
     rememberRecent(result.path)
     emit({ docs: [...state.docs, doc], activeId: doc.id, review: null })
+    if (result.large) toast(t('largeFile'), 'warn', 6500)
     return doc
   } catch (error) {
     toast(error.message || t('binary'), 'error', 6000)
@@ -807,6 +811,7 @@ export async function reloadDoc(id, { force = false } = {}) {
       eol: result.eol,
       hash: result.hash,
       size: result.size,
+      large: result.large === true,
       mtimeMs: result.mtimeMs,
       readOnly: result.readOnly,
       conflict: false,
@@ -815,6 +820,7 @@ export async function reloadDoc(id, { force = false } = {}) {
     })
     if (updated) emit({ docs: updated.docs })
     toast('已重新加载', 'success', 1500)
+    if (result.large) toast(t('largeFile'), 'warn', 6500)
   } catch (error) {
     toast(error.message || '重新加载失败', 'error')
   }

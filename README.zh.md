@@ -149,7 +149,7 @@ $pnpm = "$env:USERPROFILE\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\pnp
 
 ## 限制与安全
 
-- 单文件读取上限 16 MiB。
+- 单文件读取上限 64 MiB；超过 16 MiB 会提示大文件，预览和 AI 可能变慢。
 - 单次全文 AI 上下文约 120k 字符，超长文档会省略中间上下文。
 - 预览是快速阅读模式，不是 WYSIWYG 富文本编辑器。
 - AI 请求复用 Harness 当前模型路由，不额外保存 API Key；发送内容受该模型提供方策略约束。
