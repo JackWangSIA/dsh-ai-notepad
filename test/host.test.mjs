@@ -246,6 +246,7 @@ test('custom instructions never combine with a preset action', () => {
     after: ' world',
   })
   assert.match(custom, /改成正式语气/)
+  assert.match(custom, /不要额外添加 Markdown 标题/)
   assert.doesNotMatch(custom, /润色/)
   const preset = _internals.buildSelectionPrompt({
     action: 'polish',

@@ -49,6 +49,9 @@ import {
   clearReview,
   acceptReview,
   regenerate,
+  openReview,
+  closeReview,
+  revertLastChange,
 } from './store.js'
 import { NotepadEditor } from './editor.jsx'
 import { lineDiff, compactDiff } from './diff.js'
@@ -358,7 +361,7 @@ const QUICK_ACTIONS = [
 function AIPanel({ doc }) {
   const state = useNotepad()
   if (!state.ai.open || !doc) return null
-  if (state.review && state.review.docId === doc.id) {
+  if (state.reviewOpen && state.review && state.review.docId === doc.id) {
     return h('aside', { className: 'np-ai np-ai-review', 'aria-label': t('reviewDock') }, h(ReviewPanel, { review: state.review }))
   }
   const selection = doc.selection
@@ -381,6 +384,11 @@ function AIPanel({ doc }) {
       h(IconButton, { title: t('close'), onClick: () => closeAI() }, h(CloseIcon, { size: 14 })),
     ),
     h('div', { className: 'np-ai-body' },
+      state.review && state.review.docId === doc.id ? h('div', { className: 'np-changebar' },
+        h('span', { className: 'np-changebar-label' }, h(DiffIcon, { size: 14 }), t('appliedChange')),
+        h('button', { type: 'button', className: 'np-btn np-sm np-outline', onClick: () => openReview() }, t('reviewChange')),
+        h('button', { type: 'button', className: 'np-btn np-sm np-danger', onClick: () => revertLastChange() }, t('revertChange')),
+      ) : null,
       h('div', { className: 'np-ai-section' },
         h('div', { className: 'np-row' },
           h('p', { className: 'np-ai-label', style: { flex: 1, margin: 0 } }, t('selection')),
@@ -388,7 +396,6 @@ function AIPanel({ doc }) {
         ),
         h('div', { className: 'np-selbox' + (hasSelection ? '' : ' empty') + (selection?.unmapped ? ' unmapped' : '') },
           hasSelection ? selection.text : t('noSelection')),
-        hasSelection ? h('p', { className: 'np-hint' }, selection.text.length + ' ' + t('chars') + ' · ' + t('selectionOnly')) : null,
         selection?.unmapped ? h('p', { className: 'np-hint np-warn' }, t('previewSelectionUnmapped')) : null,
       ),
       h('div', { className: 'np-ai-section' },
@@ -406,10 +413,10 @@ function AIPanel({ doc }) {
           placeholder: t('customPlaceholder'),
           onChange: event => setAIInstruction(event.target.value),
           onKeyDown: event => {
-            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-              event.preventDefault()
-              runAI(state.ai.action, { scope: 'selection' })
-            }
+            if (event.key !== 'Enter' || event.shiftKey || event.altKey) return
+            if (event.nativeEvent?.isComposing) return
+            event.preventDefault()
+            if (!state.ai.loading) runAI(state.ai.action, { scope: 'selection' })
           },
         }),
         state.ai.instruction.trim() ? h('p', { className: 'np-hint' }, t('customModeHint')) : null,
@@ -474,10 +481,7 @@ function AIPanel({ doc }) {
       h('span', { className: 'np-spin' }),
       h('span', { style: { flex: 1 } }, t('loading')),
       h('button', { type: 'button', className: 'np-btn np-sm', onClick: cancelAI }, t('cancel')),
-    ) : h('div', { className: 'np-ai-footer' },
-      h('span', { className: 'np-hint', style: { margin: 0, flex: 1 } },
-        selection?.source === 'preview' ? t('previewSelectionHint') : (mappable ? t('selectionOnly') : t('noSelection'))),
-    ),
+    ) : null,
   )
 }
 
@@ -901,20 +905,23 @@ function SelectionContextMenu() {
 
 function ReviewPanel({ review }) {
   const state = useNotepad()
+  const autoApplied = review.autoApplied === true
   const diff = React.useMemo(() => lineDiff(review.before, review.after), [review.before, review.after])
   const ops = React.useMemo(() => compactDiff(diff.ops, 4), [diff])
   React.useEffect(() => {
-    const handler = event => { if (event.key === 'Escape') clearReview() }
+    const handler = event => {
+      if (event.key !== 'Escape') return
+      if (autoApplied) closeReview()
+      else clearReview()
+    }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [])
-  const scope = review.scope === 'document'
+  }, [autoApplied])
   return h(React.Fragment, null,
     h('div', { className: 'np-ai-head np-review-head' },
       h(DiffIcon, { size: 16 }),
       h('div', { className: 'np-ai-title' }, review.kind === 'batch' ? t('batchTitle') : t('reviewDock')),
-      h('span', { className: 'np-diff-scope' }, scope ? t('fullOnly') : t('selectionOnly')),
-      h(IconButton, { title: t('close'), onClick: clearReview }, h(CloseIcon, { size: 14 })),
+      h(IconButton, { title: t('close'), onClick: autoApplied ? closeReview : clearReview }, h(CloseIcon, { size: 14 })),
     ),
     h('div', { className: 'np-review-body' },
       h('div', { className: 'np-diff-meta np-review-meta' },
@@ -923,7 +930,7 @@ function ReviewPanel({ review }) {
         h('span', null, review.kind === 'batch' ? review.changes.length + ' 处修改' : (state.model ? `${state.model.provider}/${state.model.model}` : '')),
         diff.stats.truncated ? h('span', null, '（大规模修改）') : null,
       ),
-      h('p', { className: 'np-hint np-review-hint' }, t('reviewDockHint')),
+      h('p', { className: 'np-hint np-review-hint' }, autoApplied ? t('reviewAppliedHint') : t('reviewDockHint')),
       h('div', { className: 'np-diff np-diff-dock' }, ops.map((op, index) => {
         const kind = op.type === 'ins' ? 'add' : op.type === 'del' ? 'del' : op.type
         return h('div', { className: 'np-diff-line ' + kind, key: index },
@@ -934,24 +941,33 @@ function ReviewPanel({ review }) {
       })),
     ),
     h('div', { className: 'np-review-actions' },
-      h('p', { className: 'np-hint', style: { margin: 0 } }, '只有点击「' + (review.kind === 'batch' ? t('acceptBatch') : t('accept')) + '」后才会写入编辑器；写入后可继续 Ctrl+Z 撤销。'),
+      h('p', { className: 'np-hint', style: { margin: 0 } }, autoApplied
+        ? t('reviewAppliedHint')
+        : '只有点击「' + (review.kind === 'batch' ? t('acceptBatch') : t('accept')) + '」后才会写入编辑器；写入后可继续 Ctrl+Z 撤销。'),
       h('div', { className: 'np-row' },
-        h('button', { type: 'button', className: 'np-btn np-outline', onClick: clearReview }, t('reject')),
-        h('button', {
-          type: 'button',
-          className: 'np-btn np-outline',
-          disabled: state.ai.loading,
-          onClick: () => {
-            if (review.kind === 'batch') {
-              clearReview()
-              runBatch()
-            } else {
-              clearReview()
-              regenerate()
-            }
-          },
-        }, h(ReloadIcon, { size: 14 }), t('regenerate')),
-        h('button', { type: 'button', className: 'np-btn np-primary', style: { flex: 1 }, onClick: () => acceptReview() }, h(CheckIcon, { size: 14 }), review.kind === 'batch' ? t('acceptBatch') : t('accept')),
+        autoApplied
+          ? h(React.Fragment, null,
+            h('button', { type: 'button', className: 'np-btn np-outline', onClick: closeReview }, t('close')),
+            h('button', { type: 'button', className: 'np-btn np-danger', style: { flex: 1 }, onClick: () => revertLastChange() }, t('revertChange')),
+          )
+          : h(React.Fragment, null,
+            h('button', { type: 'button', className: 'np-btn np-outline', onClick: clearReview }, t('reject')),
+            h('button', {
+              type: 'button',
+              className: 'np-btn np-outline',
+              disabled: state.ai.loading,
+              onClick: () => {
+                if (review.kind === 'batch') {
+                  clearReview()
+                  runBatch()
+                } else {
+                  clearReview()
+                  regenerate()
+                }
+              },
+            }, h(ReloadIcon, { size: 14 }), t('regenerate')),
+            h('button', { type: 'button', className: 'np-btn np-primary', style: { flex: 1 }, onClick: () => acceptReview() }, h(CheckIcon, { size: 14 }), review.kind === 'batch' ? t('acceptBatch') : t('accept')),
+          ),
       ),
     ),
   )

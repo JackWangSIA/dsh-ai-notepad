@@ -368,8 +368,11 @@ export const CSS = `
 .np-ai-footer{background:color-mix(in srgb,var(--np-panel) 82%,transparent);padding:9px 12px}
 .np-ai-footer .np-btn{flex:0 0 auto}
 .np-ai-review{width:430px;max-width:46%;background:linear-gradient(180deg,color-mix(in srgb,var(--np-panel) 84%,var(--np-accent) 16%),var(--np-panel) 42%)}
+.np-changebar{display:flex;align-items:center;gap:6px;padding:7px 8px;margin-bottom:10px;border:1px solid color-mix(in srgb,var(--np-success) 25%,var(--np-border));border-radius:9px;background:color-mix(in srgb,var(--np-success-soft) 72%,var(--np-panel))}
+.np-changebar-label{display:flex;align-items:center;gap:5px;flex:1;min-width:0;color:var(--np-success);font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.np-changebar .np-btn{padding:4px 7px;min-height:26px;font-size:11px}
 .np-review-head .np-diff-scope{margin-left:auto}
-.np-review-head .np-btn{margin-left:0}
+.np-review-head .np-btn{margin-left:auto}
 .np-review-body{flex:1;min-height:0;overflow:auto;padding:11px 12px 8px;display:flex;flex-direction:column;gap:8px}
 .np-review-meta{padding:2px 1px}
 .np-review-hint{margin:0;font-size:11px}

@@ -75,6 +75,12 @@ const MESSAGES = {
     copyImage: '复制原图',
     imageCopied: '图片已复制到剪贴板',
     imageCopyFailed: '复制图片失败',
+    aiApplied: '已应用 AI 修改；可回看或退回',
+    appliedChange: '已应用修改',
+    reviewChange: '回看修改',
+    revertChange: '退回修改',
+    reverted: '已退回本次修改',
+    revertBlocked: '文档内容已变化，无法精确退回；请使用 Ctrl+Z',
     noPath: '新文件还没有路径',
     dirty: '未保存',
     chars: '字符',
@@ -95,6 +101,7 @@ const MESSAGES = {
     previewSelectionHint: '在预览中选中文字后，可直接用 AI 修改；只有能定位到源码的选区才会启用。',
     customModeHint: '输入自定义要求会自动切换到「自定义」，不会叠加预设动作。',
     reviewDock: '审阅修改',
+    reviewAppliedHint: '修改已应用；可回看 Diff，或退回本次修改。',
     reviewDockHint: '编辑器保持可见，接受或拒绝后再继续。',
     togglePreview: '切换预览 / 编辑',
     about: '关于',
@@ -121,7 +128,7 @@ const MESSAGES = {
     featureEditTitle: '轻量编辑',
     featureEditDesc: 'CodeMirror 6、多标签、撤销/重做、查找',
     featureSelectionTitle: '选区 AI',
-    featureSelectionDesc: '只改选中区域，Diff 确认后才写入',
+    featureSelectionDesc: '只改选中区域，应用后可回看或退回',
     featureDocumentTitle: '全文 AI',
     featureDocumentDesc: '润色、精简、总结、梳理结构、生成标题',
     featureAnnotationTitle: '多处批注',
@@ -255,6 +262,12 @@ const MESSAGES = {
     copyImage: 'Copy original image',
     imageCopied: 'Image copied to clipboard',
     imageCopyFailed: 'Could not copy image',
+    aiApplied: 'AI change applied; review or revert it here',
+    appliedChange: 'Change applied',
+    reviewChange: 'Review change',
+    revertChange: 'Revert change',
+    reverted: 'Change reverted',
+    revertBlocked: 'The document changed, so it cannot be reverted precisely; use Ctrl+Z',
     noPath: 'This new file has no path yet',
     dirty: 'Unsaved',
     chars: 'chars',
@@ -275,6 +288,7 @@ const MESSAGES = {
     previewSelectionHint: 'Select text in the preview to edit it with AI. Only selections that map back to source are enabled.',
     customModeHint: 'Typing a custom instruction switches to Custom; preset actions are not combined.',
     reviewDock: 'Review changes',
+    reviewAppliedHint: 'The change is applied; inspect the diff or revert it.',
     reviewDockHint: 'The editor stays visible; accept or reject when ready.',
     togglePreview: 'Toggle preview / edit',
     about: 'About',
@@ -301,7 +315,7 @@ const MESSAGES = {
     featureEditTitle: 'Light editor',
     featureEditDesc: 'CodeMirror 6, tabs, undo/redo, find',
     featureSelectionTitle: 'Selection AI',
-    featureSelectionDesc: 'Only the selection changes, after diff confirmation',
+    featureSelectionDesc: 'Only the selection changes; review or revert after applying',
     featureDocumentTitle: 'Document AI',
     featureDocumentDesc: 'Polish, condense, summarize, outline, titles',
     featureAnnotationTitle: 'Annotations',
@@ -482,6 +496,7 @@ const state = {
     selection: null,
   },
   review: null,
+  reviewOpen: false,
   settingsOpen: false,
   aboutOpen: false,
   associationOpen: false,
@@ -1189,11 +1204,27 @@ export function setBusy(busy) {
 }
 
 export function setReview(review) {
-  emit({ review })
+  emit({ review, reviewOpen: true })
 }
 
 export function clearReview() {
-  emit({ review: null })
+  emit({ review: null, reviewOpen: false })
+}
+
+export function openReview() {
+  if (state.review) emit({ reviewOpen: true })
+}
+
+export function closeReview() {
+  emit({ reviewOpen: false })
+}
+
+function normalizeSelectionOutput(selected, output) {
+  let text = String(output || '')
+  if (!/^\s{0,3}#{1,6}\s+/.test(selected)) text = text.replace(/^\s{0,3}#{1,6}\s+/, '')
+  if (!/^\s{0,3}[-*+]\s+/.test(selected)) text = text.replace(/^\s{0,3}[-*+]\s+/, '')
+  if (!/^\s{0,3}>\s+/.test(selected)) text = text.replace(/^\s{0,3}>\s+/, '')
+  return text
 }
 
 export async function runAI(action, options = {}) {
@@ -1234,6 +1265,8 @@ export async function runAI(action, options = {}) {
   state.ai.error = null
   state.ai.controller = controller
   state.ai.request = request
+  state.ai.instruction = ''
+  if (state.ai.action === 'custom') state.ai.action = 'polish'
   emit({})
   try {
     const result = await api('/ai', {
@@ -1245,24 +1278,38 @@ export async function runAI(action, options = {}) {
       before: request.beforeContext,
       after: request.afterContext,
     }, { signal: controller.signal })
-    const review = {
+    const after = scope === 'selection'
+      ? normalizeSelectionOutput(request.before, result.text)
+      : result.text
+    const change = {
       kind: 'single',
+      autoApplied: true,
       docId: doc.id,
       from: request.from,
       to: request.to,
       before: request.before,
-      after: result.text,
+      after,
+      afterContent: request.documentText.slice(0, request.from) + after + request.documentText.slice(request.to),
       action: effectiveAction,
       scope,
       request,
       baseContent: request.documentText,
       model: result.model,
-      stats: lineDiff(request.before, result.text).stats,
+      stats: lineDiff(request.before, after).stats,
+    }
+    if (!applySingleChange(change)) {
+      state.ai.loading = false
+      state.ai.controller = null
+      emit({})
+      return
     }
     state.ai.loading = false
     state.ai.controller = null
     state.ai.open = true
-    emit({ review })
+    state.review = change
+    state.reviewOpen = false
+    emit({})
+    toast(t('aiApplied'), 'success', 2800)
   } catch (error) {
     state.ai.loading = false
     state.ai.controller = null
@@ -1295,6 +1342,53 @@ export function regenerate() {
     scope: request.scope,
     instruction: request.instruction,
   })
+}
+
+function applySingleChange(change) {
+  const doc = state.docs.find(item => item.id === change.docId)
+  if (!doc) return false
+  if (
+    (change.baseContent !== undefined && doc.content !== change.baseContent) ||
+    doc.content.slice(change.from, change.to) !== change.before
+  ) {
+    toast(t('selectionChanged'), 'warn', 5000)
+    return false
+  }
+  if (state.editorBridge && state.editorBridge.docId === change.docId) {
+    state.editorBridge.dispatchChange({ from: change.from, to: change.to, insert: change.after })
+  } else {
+    const content = change.afterContent !== undefined
+      ? change.afterContent
+      : doc.content.slice(0, change.from) + change.after + doc.content.slice(change.to)
+    const updated = replaceDoc(change.docId, { content, cmState: null, dirty: content !== doc.savedContent })
+    if (updated) emit({ docs: updated.docs })
+  }
+  return true
+}
+
+export function revertLastChange() {
+  const change = state.review
+  if (!change || change.kind !== 'single') return
+  const doc = state.docs.find(item => item.id === change.docId)
+  if (!doc) return
+  const from = change.from
+  const to = change.from + String(change.after || '').length
+  if (doc.content.slice(from, to) !== change.after) {
+    toast(t('revertBlocked'), 'warn', 5000)
+    return
+  }
+  if (state.editorBridge && state.editorBridge.docId === change.docId) {
+    state.editorBridge.dispatchChange({ from, to, insert: change.before })
+  } else {
+    const content = doc.content.slice(0, from) + change.before + doc.content.slice(to)
+    const updated = replaceDoc(change.docId, { content, cmState: null, dirty: content !== doc.savedContent })
+    if (updated) emit({ docs: updated.docs })
+  }
+  state.review = null
+  state.reviewOpen = false
+  state.ai.open = true
+  emit({})
+  toast(t('reverted'), 'success', 1800)
 }
 
 export function applyReplacement(docId, from, to, insert) {
@@ -1450,6 +1544,8 @@ export async function runBatch() {
     state.ai.loading = false
     state.ai.controller = null
     state.ai.open = true
+    state.ai.instruction = ''
+    if (state.ai.action === 'custom') state.ai.action = 'polish'
     emit({
       review: {
         kind: 'batch',
@@ -1464,6 +1560,7 @@ export async function runBatch() {
         action: 'batch',
         scope: 'document',
       },
+      reviewOpen: true,
     })
   } catch (error) {
     state.ai.loading = false

@@ -31,7 +31,7 @@ test('editor settings persist immediately and reset cleanly', () => {
   assert.equal(store.getState().settings.fontFamily, 'Microsoft YaHei UI')
 })
 
-test('selection AI review only changes the selected range after acceptance', async () => {
+test('selection AI applies immediately and can be reviewed or reverted', async () => {
   const originalFetch = globalThis.fetch
   globalThis.fetch = async (url, init) => {
     assert.match(String(url), /\/api\/ai-notepad\/ai$/)
@@ -44,15 +44,19 @@ test('selection AI review only changes the selected range after acceptance', asy
     store.newFile()
     let doc = store.activeDoc()
     store.updateDocContent(doc.id, 'Hello world', null, { from: 0, to: 5, text: 'Hello', coords: null }, { line: 1, column: 6 })
+    store.setAIInstruction('make it different')
     await store.runAI('polish')
     doc = store.activeDoc()
     assert.equal(store.getState().review.before, 'Hello')
     assert.equal(store.getState().review.after, 'REWRITTEN')
-    assert.equal(doc.content, 'Hello world')
-    store.acceptReview()
-    doc = store.activeDoc()
+    assert.equal(store.getState().review.autoApplied, true)
+    assert.equal(store.getState().reviewOpen, false)
+    assert.equal(store.getState().ai.instruction, '')
     assert.equal(doc.content, 'REWRITTEN world')
     assert.equal(doc.dirty, true)
+    store.revertLastChange()
+    doc = store.activeDoc()
+    assert.equal(doc.content, 'Hello world')
     assert.equal(store.getState().review, null)
   } finally {
     globalThis.fetch = originalFetch
@@ -143,6 +147,7 @@ test('typing a custom instruction cannot combine with a preset action', async ()
     await store.runAI('polish')
     assert.equal(requestBody.action, 'custom')
     assert.equal(requestBody.instruction, 'make it formal')
+    assert.equal(store.getState().ai.instruction, '')
     store.clearReview()
     store.setAIAction('concise')
     assert.equal(store.getState().ai.instruction, '')
@@ -153,6 +158,28 @@ test('typing a custom instruction cannot combine with a preset action', async ()
     assert.equal(requestBody.instruction, '')
   } finally {
     store.clearReview()
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('a heading replacement does not gain a second hash marker', async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    ok: true,
+    text: '# New Heading',
+    provider: 'test',
+    model: 'test',
+  }), { status: 200, headers: { 'content-type': 'application/json' } })
+  try {
+    store.newFile()
+    const doc = store.activeDoc()
+    store.updateDocContent(doc.id, '# Old Heading', null, { from: 2, to: 13, text: 'Old Heading', coords: null }, { line: 1, column: 1 })
+    await store.runAI('polish')
+    assert.equal(store.activeDoc().content, '# New Heading')
+    assert.equal(store.getState().review.after, 'New Heading')
+    store.revertLastChange()
+    assert.equal(store.activeDoc().content, '# Old Heading')
+  } finally {
     globalThis.fetch = originalFetch
   }
 })

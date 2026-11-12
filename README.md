@@ -46,9 +46,10 @@ On DSH Desktop, prefer **Plugins → Add plugin** with the repository URL. The `
 - Encoding-aware I/O: UTF-8, UTF-8 BOM, UTF-16 LE/BE, GB18030/GBK and Windows-1252. Saves preserve the detected encoding, BOM and dominant line ending. GB18030/Windows-1252 round-trip checks refuse lossy writes.
 - Binary-file detection protects files from accidental text editing.
 - Hash-based compare-before-write: if another program changed the file while it was open, the save returns a conflict and does not write.
-- Selection-scoped AI editing: concise, polish, expand, restructure, proofread, or a custom instruction.
+- Selection-scoped AI editing: concise, polish, expand, restructure, proofread, or a custom instruction. `Enter` runs the instruction, `Shift+Enter` inserts a newline, and the prompt clears after each run.
+- AI changes apply immediately. The rail keeps a **Review change** / **Revert change** action for the last result; review shows the diff without blocking the editor, and revert restores the previous text. `Ctrl+Z` remains available.
 - Whole-document AI: polish, concise, summarize, outline and title generation.
-- A docked diff review panel with accept, reject and regenerate. The editor stays visible and keeps its scroll position; nothing is written before acceptance. Accepting uses a normal CodeMirror transaction, so Ctrl+Z still works.
+- A docked diff review is available from the rail for the last selection change; the editor stays visible and keeps its scroll position. Batch annotations still use a review panel before applying.
 - Multiple annotations can be collected and sent in one batch; every reviewed region is validated against the original document before a single undoable edit.
 - Markdown and HTML files open directly in preview mode. Markdown preview escapes raw HTML and uses a conservative CommonMark subset. HTML files are first-class too, with CodeMirror HTML syntax highlighting and a sandboxed HTML preview. **Ctrl+E** toggles preview/edit; double-clicking the preview also returns to the editor. A floating preview toolbar shows the mode and the shortcut.
 - HTML previews load saved files through the authenticated asset route (instead of copying the full document through JSON), rewrite CSS/image references once per file, and briefly cache preview assets. Right-click an image and choose **Copy original image** to put it on the clipboard.
