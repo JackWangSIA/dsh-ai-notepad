@@ -62,6 +62,10 @@ test('NotepadApp and settings page render without throwing', async () => {
   assert.match(htmlPreview, /np-html-preview/)
   assert.match(htmlPreview, /sandbox="allow-same-origin"/)
 
+  const history = module.renderHistory()
+  assert.match(history, /np-history-item/)
+  assert.match(history, /回退|Revert/)
+
   const about = module.renderAbout()
   assert.match(about, /关于 AI Notepad|About AI Notepad/)
   assert.match(about, /vdev/)

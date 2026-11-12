@@ -31,6 +31,29 @@ export function renderReview() {
   return html
 }
 
+export function renderHistory() {
+  if (getState().docs.length === 0) newFile()
+  const doc = getState().docs[0]
+  setState({
+    history: [{
+      id: 'h-test',
+      at: Date.now(),
+      docId: doc.id,
+      before: 'old',
+      after: 'new',
+      beforeContent: 'old',
+      afterContent: 'new',
+      action: 'polish',
+      scope: 'selection',
+      stats: { additions: 1, deletions: 1, truncated: false },
+    }],
+    historyOpen: true,
+  })
+  const html = renderToString(React.createElement(NotepadApp))
+  setState({ history: [], historyOpen: false })
+  return html
+}
+
 export function renderAbout() {
   if (getState().docs.length === 0) newFile()
   setAboutOpen(true)
