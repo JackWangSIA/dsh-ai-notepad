@@ -367,6 +367,22 @@ export const CSS = `
 .np-action.active{background:var(--np-accent-soft);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--np-accent) 38%,transparent)}
 .np-ai-footer{background:color-mix(in srgb,var(--np-panel) 82%,transparent);padding:9px 12px}
 .np-ai-footer .np-btn{flex:0 0 auto}
+.np-ai-review{width:430px;max-width:46%;background:linear-gradient(180deg,color-mix(in srgb,var(--np-panel) 84%,var(--np-accent) 16%),var(--np-panel) 42%)}
+.np-review-head .np-diff-scope{margin-left:auto}
+.np-review-head .np-btn{margin-left:0}
+.np-review-body{flex:1;min-height:0;overflow:auto;padding:11px 12px 8px;display:flex;flex-direction:column;gap:8px}
+.np-review-meta{padding:2px 1px}
+.np-review-hint{margin:0;font-size:11px}
+.np-diff-dock{flex:0 1 auto;min-height:180px;max-height:calc(100vh - 360px);border:1px solid var(--np-border);border-radius:9px;background:var(--np-bg)}
+.np-review-actions{border-top:1px solid var(--np-border);padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:color-mix(in srgb,var(--np-panel) 88%,transparent)}
+.np-review-actions .np-row .np-primary{flex:1}
+.np-selbox.unmapped{border-left-color:var(--np-warn);background:var(--np-warn-soft)}
+.np-hint.np-warn{color:var(--np-warn)}
+.np-preview-shell-html{background:#fff}
+.np-html-preview{position:absolute;inset:0;background:var(--np-bg)}
+.np-html-frame{position:absolute;inset:48px 0 0;width:100%;height:calc(100% - 48px);border:0;background:var(--np-bg)}
+.np-preview-loading,.np-preview-error{position:absolute;z-index:8;left:50%;top:84px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:9px;background:var(--np-panel);border:1px solid var(--np-border);box-shadow:0 8px 24px rgba(16,26,44,.12);font-size:12px;color:var(--np-text-2);max-width:80%}
+.np-preview-error{color:var(--np-warn);border-color:color-mix(in srgb,var(--np-warn) 40%,var(--np-border))}
 .np-empty{background:radial-gradient(720px 420px at 50% 36%,color-mix(in srgb,var(--np-accent) 12%,var(--np-bg)) 0%,var(--np-bg) 66%)}
 .np-mark{width:78px;height:78px;border-radius:22px;background:var(--np-accent-gradient);color:#fff;box-shadow:0 18px 36px color-mix(in srgb,var(--np-accent) 28%,transparent);margin-bottom:20px}
 .np-emptybox h2{font-size:23px;letter-spacing:-.02em;margin-bottom:8px}

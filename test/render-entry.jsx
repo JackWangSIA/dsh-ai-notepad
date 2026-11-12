@@ -39,6 +39,20 @@ export function renderAbout() {
   return html
 }
 
+export function renderHtmlPreview() {
+  if (getState().docs.length === 0) newFile()
+  const doc = getState().docs[0]
+  setState({
+    docs: getState().docs.map(item => item.id === doc.id ? {
+      ...item,
+      name: 'preview.html',
+      content: '<link rel="stylesheet" href="./assets/theme.css"><h1>HTML</h1>',
+      preview: true,
+    } : item),
+  })
+  return renderToString(React.createElement(NotepadApp))
+}
+
 export function renderPreview() {
   if (getState().docs.length === 0) newFile()
   const doc = getState().docs[0]

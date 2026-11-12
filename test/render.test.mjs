@@ -49,12 +49,18 @@ test('NotepadApp and settings page render without throwing', async () => {
   assert.match(settings, /AI Notepad/)
 
   const review = module.renderReview()
-  assert.match(review, /AI (修改对比|change review)|np-diff/)
+  assert.match(review, /np-ai-review|np-diff/)
+  assert.match(review, /np-review-actions/)
+  assert.doesNotMatch(review, /np-overlay/)
 
   const preview = module.renderPreview()
   assert.match(preview, /<h1>Heading<\/h1>/)
   assert.match(preview, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/)
   assert.doesNotMatch(preview, /<script>alert/)
+
+  const htmlPreview = module.renderHtmlPreview()
+  assert.match(htmlPreview, /np-html-preview/)
+  assert.match(htmlPreview, /sandbox="allow-same-origin"/)
 
   const about = module.renderAbout()
   assert.match(about, /关于 AI Notepad|About AI Notepad/)

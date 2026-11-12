@@ -37,6 +37,8 @@ import {
   setAIAction,
   setAIInstruction,
   setPreview,
+  setPreviewSelection,
+  previewKind,
   t,
   toast,
   useNotepad,
@@ -95,10 +97,6 @@ const RECOMMENDED_FONTS = [
 export function cssFontStack(name) {
   const clean = String(name == null ? '' : name).replace(/["'\\]/g, '').trim() || 'Microsoft YaHei UI'
   return `"${clean}", "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", sans-serif`
-}
-
-function isMarkdown(doc) {
-  return /\.(md|markdown|mdx)$/i.test(doc?.name || '')
 }
 
 function fileNameOf(filePath) {
@@ -195,8 +193,8 @@ function ViewMenuButton() {
       items: [
         { label: t('settings'), icon: h(SettingsIcon, { size: 14 }), onSelect: openSettings },
         { label: t('associations'), icon: h(LinkIcon, { size: 14 }), onSelect: openAssociations },
-        ...(isMarkdown(doc) ? ['separator', {
-          label: doc.preview ? t('edit') : t('preview'),
+        ...(previewKind(doc) ? ['separator', {
+          label: doc.preview ? t('edit') : (previewKind(doc) === 'html' ? t('htmlPreviewMode') : t('preview')),
           icon: doc.preview ? h(EditIcon, { size: 14 }) : h(EyeIcon, { size: 14 }),
           shortcut: 'Ctrl+E',
           onSelect: () => setPreview(doc.id, !doc.preview),
@@ -333,7 +331,7 @@ function FloatingBar({ doc }) {
   const run = action => event => {
     event.preventDefault()
     event.stopPropagation()
-    runAI(action)
+    runAI(action, { instruction: '' })
   }
   return h('div', {
     className: 'np-floatbar',
@@ -360,9 +358,16 @@ const QUICK_ACTIONS = [
 function AIPanel({ doc }) {
   const state = useNotepad()
   if (!state.ai.open || !doc) return null
+  if (state.review && state.review.docId === doc.id) {
+    return h('aside', { className: 'np-ai np-ai-review', 'aria-label': t('reviewDock') }, h(ReviewPanel, { review: state.review }))
+  }
   const selection = doc.selection
   const hasSelection = !!(selection && selection.text)
-  const run = (action, scope) => runAI(action, { scope })
+  const mappable = hasSelection && selection.from >= 0
+  const run = (action, scope) => runAI(action, {
+    scope,
+    instruction: action === 'custom' ? state.ai.instruction : '',
+  })
   const fullActions = [
     ['polish', t('polish')],
     ['concise', t('concise')],
@@ -377,10 +382,14 @@ function AIPanel({ doc }) {
     ),
     h('div', { className: 'np-ai-body' },
       h('div', { className: 'np-ai-section' },
-        h('p', { className: 'np-ai-label' }, t('selection')),
-        h('div', { className: 'np-selbox' + (hasSelection ? '' : ' empty') },
+        h('div', { className: 'np-row' },
+          h('p', { className: 'np-ai-label', style: { flex: 1, margin: 0 } }, t('selection')),
+          selection?.source === 'preview' ? h('span', { className: 'np-badge' }, t('previewSelection')) : null,
+        ),
+        h('div', { className: 'np-selbox' + (hasSelection ? '' : ' empty') + (selection?.unmapped ? ' unmapped' : '') },
           hasSelection ? selection.text : t('noSelection')),
         hasSelection ? h('p', { className: 'np-hint' }, selection.text.length + ' ' + t('chars') + ' · ' + t('selectionOnly')) : null,
+        selection?.unmapped ? h('p', { className: 'np-hint np-warn' }, t('previewSelectionUnmapped')) : null,
       ),
       h('div', { className: 'np-ai-section' },
         h('p', { className: 'np-ai-label' }, t('custom')),
@@ -403,18 +412,19 @@ function AIPanel({ doc }) {
             }
           },
         }),
+        state.ai.instruction.trim() ? h('p', { className: 'np-hint' }, t('customModeHint')) : null,
         h('div', { className: 'np-row', style: { marginTop: 7 } },
           h('button', {
             type: 'button',
             className: 'np-btn np-primary',
             style: { flex: 1 },
-            disabled: !hasSelection || state.ai.loading,
+            disabled: !mappable || state.ai.loading,
             onClick: () => run(state.ai.action, 'selection'),
           }, state.ai.loading ? h('span', { className: 'np-spin' }) : h(SparkIcon, { size: 14 }), t('run')),
           h('button', {
             type: 'button',
             className: 'np-btn np-outline',
-            disabled: !hasSelection || state.ai.loading,
+            disabled: !mappable || state.ai.loading,
             onClick: () => addAnnotation(),
             title: 'Ctrl+Alt+B',
           }, t('addAnnotation')),
@@ -465,8 +475,62 @@ function AIPanel({ doc }) {
       h('span', { style: { flex: 1 } }, t('loading')),
       h('button', { type: 'button', className: 'np-btn np-sm', onClick: cancelAI }, t('cancel')),
     ) : h('div', { className: 'np-ai-footer' },
-      h('span', { className: 'np-hint', style: { margin: 0, flex: 1 } }, hasSelection ? t('selectionOnly') : t('noSelection')),
+      h('span', { className: 'np-hint', style: { margin: 0, flex: 1 } },
+        selection?.source === 'preview' ? t('previewSelectionHint') : (mappable ? t('selectionOnly') : t('noSelection'))),
     ),
+  )
+}
+
+function HtmlPreview({ doc, onDoubleClick }) {
+  const frameRef = React.useRef(null)
+  const [srcDoc, setSrcDoc] = React.useState('')
+  const [error, setError] = React.useState(null)
+  const [loading, setLoading] = React.useState(true)
+  React.useEffect(() => {
+    const controller = new AbortController()
+    setLoading(true)
+    const timer = setTimeout(async () => {
+      try {
+        const result = await api('/preview-html', { html: doc.content, basePath: doc.path || '' }, { signal: controller.signal })
+        setSrcDoc(result.html || '')
+        setError(null)
+      } catch (failure) {
+        if (failure.name !== 'AbortError') setError(failure.message || 'HTML 预览加载失败')
+      } finally {
+        setLoading(false)
+      }
+    }, 160)
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
+  }, [doc.content, doc.path])
+  const capture = () => {
+    try {
+      const selection = frameRef.current?.contentWindow?.getSelection()
+      if (selection && !selection.isCollapsed) setPreviewSelection(selection.toString())
+    } catch {}
+  }
+  const onLoad = () => {
+    try {
+      const target = frameRef.current?.contentDocument
+      if (!target) return
+      target.addEventListener('mouseup', capture)
+      target.addEventListener('keyup', capture)
+      target.addEventListener('dblclick', onDoubleClick)
+    } catch {}
+  }
+  return h('div', { className: 'np-html-preview' },
+    error ? h('div', { className: 'np-preview-error' }, h(WarnIcon, { size: 16 }), h('span', null, error)) : null,
+    loading ? h('div', { className: 'np-preview-loading' }, h('span', { className: 'np-spin' }), 'HTML 预览加载中…') : null,
+    h('iframe', {
+      ref: frameRef,
+      className: 'np-html-frame',
+      title: 'HTML preview',
+      sandbox: 'allow-same-origin',
+      srcDoc,
+      onLoad,
+    }),
   )
 }
 
@@ -488,7 +552,7 @@ export function EditorPane() {
       if (mod && event.key.toLowerCase() === 's') { event.preventDefault(); saveDoc() }
       if (mod && !event.shiftKey && event.key.toLowerCase() === 'e') {
         const current = activeDoc()
-        if (current && isMarkdown(current)) {
+        if (current && previewKind(current)) {
           event.preventDefault()
           setPreview(current.id, !current.preview)
         }
@@ -531,7 +595,8 @@ export function EditorPane() {
     return h('div', { className: 'np-main' }, h(EmptyState))
   }
 
-  const preview = isMarkdown(doc) && doc.preview
+  const kind = previewKind(doc)
+  const preview = !!kind && doc.preview
   const leavePreview = () => {
     setPreview(doc.id, false)
     setTimeout(() => {
@@ -551,17 +616,25 @@ export function EditorPane() {
       ) : null,
       h('div', { className: 'np-editor-wrap' },
         preview
-          ? h('div', { className: 'np-preview-shell' },
+          ? h('div', { className: 'np-preview-shell' + (kind === 'html' ? ' np-preview-shell-html' : '') },
             h('div', { className: 'np-previewbar' },
-              h('span', { className: 'np-preview-pill' }, h(EyeIcon, { size: 13 }), t('previewMode')),
+              h('span', { className: 'np-preview-pill' }, h(EyeIcon, { size: 13 }), kind === 'html' ? t('htmlPreviewMode') : t('previewMode')),
               h('button', { type: 'button', className: 'np-btn np-sm np-preview-edit', onClick: leavePreview, title: t('togglePreview') + ' (Ctrl+E)' }, h(EditIcon, { size: 13 }), t('edit'), h('span', { className: 'np-kbd' }, 'Ctrl+E')),
             ),
-            h('div', {
-              className: 'np-preview',
-              onDoubleClick: leavePreview,
-              title: t('previewHint'),
-              dangerouslySetInnerHTML: { __html: renderMarkdown(doc.content) },
-            }),
+            kind === 'html'
+              ? h(HtmlPreview, { doc, onDoubleClick: leavePreview })
+              : h('div', {
+                className: 'np-preview',
+                onDoubleClick: leavePreview,
+                onMouseUp: event => {
+                  const selection = window.getSelection()
+                  if (!selection || selection.isCollapsed) return
+                  if (!event.currentTarget.contains(selection.anchorNode)) return
+                  setPreviewSelection(selection.toString())
+                },
+                title: t('previewHint'),
+                dangerouslySetInnerHTML: { __html: renderMarkdown(doc.content) },
+              }),
             h('div', { className: 'np-preview-hint' }, t('previewHint')),
           )
           : h(NotepadEditor, { doc }),
@@ -690,7 +763,6 @@ function NotepadAppInner() {
     h(EditorPane),
     h(StatusBar, { doc }),
     h(SelectionContextMenu),
-    state.review ? h(DiffModal, { review: state.review }) : null,
     state.settingsOpen ? h(SettingsModal) : null,
     state.aboutOpen ? h(AboutModal) : null,
     state.associationOpen ? h(AssociationModal) : null,
@@ -727,10 +799,10 @@ function SelectionContextMenu() {
     style: { left: Math.min(menu.x, window.innerWidth - 220) + 'px', top: Math.min(menu.y, window.innerHeight - 260) + 'px' },
     onMouseDown: event => event.stopPropagation(),
   },
-    item(t('polish'), () => runAI('polish'), 'Ctrl+Alt+2'),
-    item(t('concise'), () => runAI('concise'), 'Ctrl+Alt+1'),
-    item(t('expand'), () => runAI('expand'), 'Ctrl+Alt+3'),
-    item(t('proofread'), () => runAI('proofread'), 'Ctrl+Alt+4'),
+    item(t('polish'), () => runAI('polish', { instruction: '' }), 'Ctrl+Alt+2'),
+    item(t('concise'), () => runAI('concise', { instruction: '' }), 'Ctrl+Alt+1'),
+    item(t('expand'), () => runAI('expand', { instruction: '' }), 'Ctrl+Alt+3'),
+    item(t('proofread'), () => runAI('proofread', { instruction: '' }), 'Ctrl+Alt+4'),
     h('div', { className: 'np-menu-sep' }),
     item(t('addAnnotation'), () => addAnnotation(), 'Ctrl+Alt+B'),
     item(t('copy'), () => copySelection()),
@@ -738,7 +810,7 @@ function SelectionContextMenu() {
   )
 }
 
-function DiffModal({ review }) {
+function ReviewPanel({ review }) {
   const state = useNotepad()
   const diff = React.useMemo(() => lineDiff(review.before, review.after), [review.before, review.after])
   const ops = React.useMemo(() => compactDiff(diff.ops, 4), [diff])
@@ -748,34 +820,33 @@ function DiffModal({ review }) {
     return () => window.removeEventListener('keydown', handler)
   }, [])
   const scope = review.scope === 'document'
-  return h('div', { className: 'np-overlay', onMouseDown: event => { if (event.target === event.currentTarget) clearReview() } },
-    h('div', { className: 'np-modal wide', role: 'dialog', 'aria-modal': 'true' },
-      h('div', { className: 'np-modal-head' },
-        h(DiffIcon, { size: 18 }),
-        h('div', { className: 'np-modal-title' }, review.kind === 'batch' ? t('batchTitle') : t('reviewTitle')),
-        h('span', { className: 'np-diff-scope' }, scope ? t('fullOnly') : t('selectionOnly')),
-        h(IconButton, { title: t('close'), onClick: clearReview }, h(CloseIcon)),
+  return h(React.Fragment, null,
+    h('div', { className: 'np-ai-head np-review-head' },
+      h(DiffIcon, { size: 16 }),
+      h('div', { className: 'np-ai-title' }, review.kind === 'batch' ? t('batchTitle') : t('reviewDock')),
+      h('span', { className: 'np-diff-scope' }, scope ? t('fullOnly') : t('selectionOnly')),
+      h(IconButton, { title: t('close'), onClick: clearReview }, h(CloseIcon, { size: 14 })),
+    ),
+    h('div', { className: 'np-review-body' },
+      h('div', { className: 'np-diff-meta np-review-meta' },
+        h('span', { className: 'np-diff-add' }, '+' + diff.stats.additions),
+        h('span', { className: 'np-diff-del' }, '-' + diff.stats.deletions),
+        h('span', null, review.kind === 'batch' ? review.changes.length + ' 处修改' : (state.model ? `${state.model.provider}/${state.model.model}` : '')),
+        diff.stats.truncated ? h('span', null, '（大规模修改）') : null,
       ),
-      h('div', { className: 'np-modal-body flush' },
-        h('div', { style: { padding: '9px 14px', borderBottom: '1px solid var(--np-border)' } },
-          h('div', { className: 'np-diff-meta' },
-            h('span', { className: 'np-diff-add' }, '+' + diff.stats.additions),
-            h('span', { className: 'np-diff-del' }, '-' + diff.stats.deletions),
-            h('span', null, review.kind === 'batch' ? review.changes.length + ' 处修改' : (state.model ? `${state.model.provider}/${state.model.model}` : '')),
-            diff.stats.truncated ? h('span', null, '（大规模修改）') : null,
-          ),
-        ),
-        h('div', { className: 'np-diff' }, ops.map((op, index) => {
-          const kind = op.type === 'ins' ? 'add' : op.type === 'del' ? 'del' : op.type
-          return h('div', { className: 'np-diff-line ' + kind, key: index },
-            h('span', { className: 'ln' }, op.type === 'gap' ? '…' : String(op.newLine || op.oldLine || '')),
-            h('span', { className: 'sign' }, op.type === 'ins' ? '+' : op.type === 'del' ? '-' : ' '),
-            h('span', { className: 'txt' }, op.text === '' ? ' ' : op.text),
-          )
-        })),
-      ),
-      h('div', { className: 'np-modal-foot' },
-        h('span', { className: 'np-hint', style: { margin: 0, flex: 1 } }, '只有点击「' + (review.kind === 'batch' ? t('acceptBatch') : t('accept')) + '」后才会写入编辑器；写入后可继续 Ctrl+Z 撤销。'),
+      h('p', { className: 'np-hint np-review-hint' }, t('reviewDockHint')),
+      h('div', { className: 'np-diff np-diff-dock' }, ops.map((op, index) => {
+        const kind = op.type === 'ins' ? 'add' : op.type === 'del' ? 'del' : op.type
+        return h('div', { className: 'np-diff-line ' + kind, key: index },
+          h('span', { className: 'ln' }, op.type === 'gap' ? '…' : String(op.newLine || op.oldLine || '')),
+          h('span', { className: 'sign' }, op.type === 'ins' ? '+' : op.type === 'del' ? '-' : ' '),
+          h('span', { className: 'txt' }, op.text === '' ? ' ' : op.text),
+        )
+      })),
+    ),
+    h('div', { className: 'np-review-actions' },
+      h('p', { className: 'np-hint', style: { margin: 0 } }, '只有点击「' + (review.kind === 'batch' ? t('acceptBatch') : t('accept')) + '」后才会写入编辑器；写入后可继续 Ctrl+Z 撤销。'),
+      h('div', { className: 'np-row' },
         h('button', { type: 'button', className: 'np-btn np-outline', onClick: clearReview }, t('reject')),
         h('button', {
           type: 'button',
@@ -791,7 +862,7 @@ function DiffModal({ review }) {
             }
           },
         }, h(ReloadIcon, { size: 14 }), t('regenerate')),
-        h('button', { type: 'button', className: 'np-btn np-primary', onClick: () => acceptReview() }, h(CheckIcon, { size: 14 }), review.kind === 'batch' ? t('acceptBatch') : t('accept')),
+        h('button', { type: 'button', className: 'np-btn np-primary', style: { flex: 1 }, onClick: () => acceptReview() }, h(CheckIcon, { size: 14 }), review.kind === 'batch' ? t('acceptBatch') : t('accept')),
       ),
     ),
   )
@@ -1229,8 +1300,8 @@ function AssociationModal() {
         h(IconButton, { title: t('close'), onClick: () => setAssociationOpen(false) }, h(CloseIcon)),
       ),
       h('div', { className: 'np-modal-body' },
-        h('p', { className: 'np-hint', style: { marginTop: 0 } }, t('associationHint')),
-        h('div', { className: 'np-assoc-status' },
+        h('p', { className: 'np-hint', style: { marginTop: 0 } }, association?.supported === false ? association.note : t('associationHint')),
+        association?.supported === false ? null : h('div', { className: 'np-assoc-status' },
           h('span', null, association?.registered ? t('associationRegistered') : t('associationNone')),
           association?.command ? h('span', { className: 'np-badge' }, 'HKCU') : null,
           h('span', { className: 'np-grow', style: { flex: 1 } }),
@@ -1250,12 +1321,12 @@ function AssociationModal() {
         ),
         h('div', { style: { height: 10 } }),
         h('div', { className: 'np-ext-list' }, rows.length ? rows.map(item => h(AssociationRow, { key: item.extension, item })) : h('span', { className: 'np-hint' }, '点击「刷新」读取当前扩展名状态。')),
-        h('div', { className: 'np-row', style: { marginTop: 12 } },
+        association?.supported === false ? null : h('div', { className: 'np-row', style: { marginTop: 12 } },
           h('button', { type: 'button', className: 'np-btn np-primary', disabled: busy, onClick: doInstall }, busy ? h('span', { className: 'np-spin' }) : h(LinkIcon, { size: 14 }), t('associationInstall')),
           h('button', { type: 'button', className: 'np-btn np-outline', disabled: busy, onClick: () => doRemove(false) }, t('associationRemove')),
           h('button', { type: 'button', className: 'np-btn np-danger', disabled: busy, onClick: () => doRemove(true) }, t('associationRestore')),
         ),
-        h('div', { className: 'np-row', style: { marginTop: 8 } },
+        association?.supported === false ? null : h('div', { className: 'np-row', style: { marginTop: 8 } },
           h('button', { type: 'button', className: 'np-btn np-outline', onClick: () => openDefaultApps() }, h(ExternalIcon, { size: 14 }), t('associationDefault')),
           h('button', {
             type: 'button',
@@ -1267,8 +1338,8 @@ function AssociationModal() {
             },
           }, t('associationOpenWith')),
         ),
-        h('div', { className: 'np-hint', style: { marginTop: 12 } }, t('associationDefaultHint')),
-        h('div', { className: 'np-hint' },
+        association?.supported === false ? null : h('div', { className: 'np-hint', style: { marginTop: 12 } }, t('associationDefaultHint')),
+        association?.supported === false ? null : h('div', { className: 'np-hint' },
           '实现说明：Windows 10/11 的默认应用选择由系统哈希保护，任何第三方程序都无法静默改默认。本插件注册的是真实的当前用户级 ProgID / OpenWithProgids / RegisteredApplications；双击文件由随插件安装的 VBS 启动器写入队列并唤起 DSH。卸载会移除这些注册，并在本应用是默认时清理 UserChoice 让系统重新询问。'),
       ),
       h('div', { className: 'np-modal-foot' },

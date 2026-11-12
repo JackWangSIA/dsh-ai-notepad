@@ -24,7 +24,7 @@ AI Notepad 不是完整的 IDE，也不是一个只支持 Markdown 的预览器�
 - 临时打开 TXT、LOG、JSON、YAML、CSV、配置文件；
 - 写 Markdown、README、笔记和文档；
 - 查看代码或日志，做局部 AI 润色、纠错、精简；
-- 在 Windows 资源管理器里直接双击文本文件，进入 Harness 编辑。
+- 在 Windows 资源管理器里直接双击文本文件，进入 Harness 编辑；Linux/macOS 使用系统文件选择器打开与另存。
 
 ## 功能
 
@@ -48,7 +48,7 @@ AI Notepad 不是完整的 IDE，也不是一个只支持 Markdown 的预览器�
 - 纠错
 - 自定义要求
 
-AI 只输出选中区域的替换文本；原文件不会被直接修改。修改会先进入 Diff 审阅，只有点击**接受修改**后才会进入编辑器，并且仍可 `Ctrl+Z` 撤销。
+AI 只输出选中区域的替换文本；原文件不会被直接修改。修改会先进入右侧非模态 Diff 审阅栏，编辑器保持可见且不改变滚动位置；只有点击**接受修改**后才会进入编辑器，并且仍可 `Ctrl+Z` 撤销。
 
 ### 全文与批注
 
@@ -56,20 +56,31 @@ AI 只输出选中区域的替换文本；原文件不会被直接修改。修�
 - 对多个区域分别写批注，最后统一交给 AI 处理。
 - 批量修改逐段校验原文，再以一个可撤销事务应用。
 
-### Markdown
+### Markdown / HTML
 
 - Markdown 预览，原始 HTML 会被转义。
+- HTML 也是一等文本类型：CodeMirror HTML 语法高亮、沙箱 HTML 预览。
+- HTML 预览会重写相对 `href` / `src` / `srcset`、内联 CSS 和链接 CSS 的 `url()`，使相对 CSS、图片和字体按 HTML 文件所在目录解析，而不是落到 Harness 应用地址；脚本仍被阻止。
+- 在 Markdown/HTML 预览中选中文字，可直接交给选区 AI；只有能映射回源码的选区会启用。
 - `Ctrl+E` 切换预览 / 编辑。
 - 双击预览区域直接回到编辑器。
 
 ### 外观
 
-- 可搜索的系统字体选择器，带推荐字体、字体样例和实时排版预览。
+- 可搜索的系统字体选择器，带推荐字体、字体样例和实时排版预览；Windows 使用 PowerShell，Linux 使用 `fc-list`。
 - 字号 8–48px，`Ctrl+滚轮` 快速缩放。
 - 行距、字重、自动换行、行号、Tab 宽度、浅色/深色主题。
 - 设置持久保存。
 
 ![AI Notepad 关于面板](assets/screenshot-about.png)
+
+### Linux / macOS
+
+- Linux 打开/另存使用 `zenity`、`kdialog` 或 `yad`；如果没有弹窗，安装其中一个即可。
+- macOS 使用 `osascript`。
+- 字体优先使用 `fc-list`，不可用时使用安全回退列表。
+- reveal 使用 FreeDesktop `FileManager1` D-Bus，失败时回退 `xdg-open`；macOS 使用 `open -R`。
+- 系统文件关联仍仅支持 Windows；Linux/macOS 的关联面板会说明并隐藏安装/移除操作，不影响正常编辑。
 
 ### Windows 文件关联
 
@@ -87,7 +98,7 @@ AI 只输出选中区域的替换文本；原文件不会被直接修改。修�
 | `Ctrl+S` / `Ctrl+Shift+S` | 保存 / 另存为 |
 | `Ctrl+Z` / `Ctrl+Y` | 撤销 / 重做 |
 | `Ctrl+F` | 查找 |
-| `Ctrl+E` | 切换 Markdown 预览 / 编辑 |
+| `Ctrl+E` | 切换 Markdown / HTML 预览 / 编辑 |
 | `Ctrl+滚轮`、`Ctrl+=`、`Ctrl+-`、`Ctrl+0` | 放大 / 缩小 / 恢复字号 |
 | `Ctrl+Alt+1..4` | 选区精简 / 润色 / 扩写 / 纠错 |
 | `Ctrl+Alt+B` | 加入批注 |

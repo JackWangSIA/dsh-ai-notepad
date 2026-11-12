@@ -82,14 +82,21 @@ const MESSAGES = {
     model: '模型',
     preview: '预览',
     edit: '编辑',
-    previewEmpty: '没有可预览的 Markdown 内容',
+    previewEmpty: '没有可预览的 Markdown 或 HTML 内容',
     previewMode: 'Markdown 预览',
+    htmlPreviewMode: 'HTML 预览',
     previewHint: '双击预览区域可切换到编辑；Ctrl+E 随时切换',
+    previewSelection: '预览选区',
+    previewSelectionUnmapped: '这段预览选区无法精确映射回源码，请在编辑器中重新选中。',
+    previewSelectionHint: '在预览中选中文字后，可直接用 AI 修改；只有能定位到源码的选区才会启用。',
+    customModeHint: '输入自定义要求会自动切换到「自定义」，不会叠加预设动作。',
+    reviewDock: '审阅修改',
+    reviewDockHint: '编辑器保持可见，接受或拒绝后再继续。',
     togglePreview: '切换预览 / 编辑',
     about: '关于',
     aboutTitle: '关于 AI Notepad',
     aboutTagline: '轻量、通用、AI 原生的文本编辑器',
-    aboutIntro: '普通文本编辑 + 选区 AI 智能修改 + Windows 文件关联。它不是完整 IDE，只把日常写作、查看和局部改写文本这件事做轻、做顺。',
+    aboutIntro: '普通文本编辑 + 选区 AI 智能修改 + 跨平台原生文件选择。它不是完整 IDE，只把日常写作、查看和局部改写文本这件事做轻、做顺。',
     aboutFeatures: '能做什么',
     aboutShortcuts: '常用快捷键',
     aboutRuntime: '运行信息',
@@ -115,17 +122,17 @@ const MESSAGES = {
     featureDocumentDesc: '润色、精简、总结、梳理结构、生成标题',
     featureAnnotationTitle: '多处批注',
     featureAnnotationDesc: '逐段提要求，最后一次性统一处理',
-    featurePreviewTitle: 'Markdown 预览',
-    featurePreviewDesc: '预览/编辑 Ctrl+E 切换，双击预览回到编辑',
-    featureAssocTitle: 'Windows 集成',
-    featureAssocDesc: '当前用户级 Open With + 轻量启动器',
+    featurePreviewTitle: 'Markdown / HTML 预览',
+    featurePreviewDesc: 'Markdown 与 HTML 预览，相对 CSS/图片可加载',
+    featureAssocTitle: '跨平台原生集成',
+    featureAssocDesc: 'Linux/macOS 选择器；Windows 当前用户级 Open With',
     featureModelTitle: '复用 Harness 模型',
     featureModelDesc: '无需额外 API Key，沿用当前默认模型',
     limitAssoc: 'Windows 默认应用仍受 UserChoice 哈希保护，注册 Open With 后需要手动选择一次“始终使用”。',
     limitEditor: '预览是快速查看模式；双击预览会回到编辑，不提供完整的 WYSIWYG 富文本编辑。',
     limitSize: '单文件读取上限 16 MiB；全文 AI 上下文约 120k 字符，超长文档会截断中间上下文。',
-    aboutUpdateCurrent: '当前版本：搜索式字体选择器、Ctrl+滚轮缩放、Ctrl+E 预览切换、关于面板与界面重构。',
-    aboutUpdatePrev: '此前版本：Windows 文件关联与启动器、全文/批量 AI、Markdown 预览、编码保留与 Diff 审阅。',
+    aboutUpdateCurrent: '当前版本：Linux/macOS 原生文件选择、HTML 预览与资源重写、非模态 Diff 侧栏、自定义要求隔离、预览选区 AI。',
+    aboutUpdatePrev: '此前版本：搜索式字体选择器、Ctrl+滚轮缩放、Markdown 预览、Windows 文件关联与启动器。',
     fontSearch: '搜索字体…',
     fontRecommended: '推荐',
     fontAll: '全部字体',
@@ -134,7 +141,7 @@ const MESSAGES = {
     fontPreview: '中文 Aa 123',
     featureSelection: '选区 AI',
     featureEncoding: '编码保留',
-    featureAssoc: 'Windows 文件关联',
+    featureAssoc: '原生文件集成',
     zoom: '字号',
     find: '查找',
     fileMenu: '文件',
@@ -251,14 +258,21 @@ const MESSAGES = {
     model: 'Model',
     preview: 'Preview',
     edit: 'Edit',
-    previewEmpty: 'No Markdown to preview',
+    previewEmpty: 'No Markdown or HTML to preview',
     previewMode: 'Markdown preview',
+    htmlPreviewMode: 'HTML preview',
     previewHint: 'Double-click the preview to edit; Ctrl+E toggles anytime',
+    previewSelection: 'Preview selection',
+    previewSelectionUnmapped: 'This preview selection cannot be mapped back to the source. Select it in the editor instead.',
+    previewSelectionHint: 'Select text in the preview to edit it with AI. Only selections that map back to source are enabled.',
+    customModeHint: 'Typing a custom instruction switches to Custom; preset actions are not combined.',
+    reviewDock: 'Review changes',
+    reviewDockHint: 'The editor stays visible; accept or reject when ready.',
     togglePreview: 'Toggle preview / edit',
     about: 'About',
     aboutTitle: 'About AI Notepad',
     aboutTagline: 'A lightweight, general-purpose, AI-native text editor',
-    aboutIntro: 'Plain text editing + selection-scoped AI + Windows file associations. Not an IDE: it keeps daily writing, viewing and local rewriting light and direct.',
+    aboutIntro: 'Plain text editing + selection-scoped AI + native file pickers. Not an IDE: it keeps daily writing, viewing and local rewriting light and direct.',
     aboutFeatures: 'What it does',
     aboutShortcuts: 'Shortcuts',
     aboutRuntime: 'Runtime',
@@ -284,17 +298,17 @@ const MESSAGES = {
     featureDocumentDesc: 'Polish, condense, summarize, outline, titles',
     featureAnnotationTitle: 'Annotations',
     featureAnnotationDesc: 'Collect instructions, process them together',
-    featurePreviewTitle: 'Markdown preview',
-    featurePreviewDesc: 'Ctrl+E toggles; double-click returns to edit',
-    featureAssocTitle: 'Windows integration',
-    featureAssocDesc: 'Per-user Open With + lightweight launcher',
+    featurePreviewTitle: 'Markdown / HTML preview',
+    featurePreviewDesc: 'Markdown and HTML preview with relative CSS and images',
+    featureAssocTitle: 'Cross-platform native integration',
+    featureAssocDesc: 'Linux/macOS pickers; Windows per-user Open With',
     featureModelTitle: 'Harness model',
     featureModelDesc: 'No extra API key; uses the current default model',
     limitAssoc: 'Windows still protects the default-app choice with UserChoice. After registering Open With, choose “Always use” once.',
     limitEditor: 'Preview is a quick reading mode; double-clicking returns to editing, not a full WYSIWYG editor.',
     limitSize: 'File read limit 16 MiB; document AI context about 120k characters; very long documents omit the middle context.',
-    aboutUpdateCurrent: 'Current: searchable font picker, Ctrl+wheel zoom, Ctrl+E preview toggle, About panel and UI refresh.',
-    aboutUpdatePrev: 'Earlier: Windows associations and launcher, document/batch AI, Markdown preview, encoding preservation and diff review.',
+    aboutUpdateCurrent: 'Current: Linux/macOS native pickers, HTML preview with asset rewriting, docked diff review, custom-instruction isolation and preview selection AI.',
+    aboutUpdatePrev: 'Earlier: searchable font picker, Ctrl+wheel zoom, Markdown preview, Windows associations and launcher.',
     fontSearch: 'Search fonts…',
     fontRecommended: 'Recommended',
     fontAll: 'All fonts',
@@ -303,7 +317,7 @@ const MESSAGES = {
     fontPreview: 'Aa 中文 123',
     featureSelection: 'Selection AI',
     featureEncoding: 'Encoding-safe',
-    featureAssoc: 'Windows file associations',
+    featureAssoc: 'Native file integration',
     zoom: 'Font size',
     find: 'Find',
     fileMenu: 'File',
@@ -524,6 +538,13 @@ export function activeDoc() {
   return state.docs.find(doc => doc.id === state.activeId) || null
 }
 
+export function previewKind(doc) {
+  const name = String(doc?.name || doc?.path || '').toLowerCase()
+  if (/\.(md|markdown|mdx)$/.test(name)) return 'markdown'
+  if (/\.(html?|htm)$/.test(name)) return 'html'
+  return null
+}
+
 function replaceDoc(id, patch) {
   const index = state.docs.findIndex(doc => doc.id === id)
   if (index === -1) return null
@@ -590,13 +611,53 @@ export function setSelection(id, selection) {
   if (updated) emit({ docs: updated.docs })
 }
 
+function findTextRange(content, text) {
+  const source = String(content || '')
+  const needle = String(text || '').trim()
+  if (!needle) return null
+  const exact = source.indexOf(needle)
+  if (exact !== -1) return { from: exact, to: exact + needle.length }
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')
+  try {
+    const match = new RegExp(escaped, 'm').exec(source)
+    if (match) return { from: match.index, to: match.index + match[0].length }
+  } catch {}
+  return null
+}
+
+export function setPreviewSelection(text) {
+  const doc = activeDoc()
+  if (!doc) return
+  const value = String(text || '').trim()
+  if (!value) {
+    setSelection(doc.id, { from: 0, to: 0, text: '', coords: null, source: 'preview' })
+    return
+  }
+  const range = findTextRange(doc.content, value)
+  setSelection(doc.id, {
+    from: range ? range.from : -1,
+    to: range ? range.to : -1,
+    text: value,
+    coords: null,
+    source: 'preview',
+    unmapped: !range,
+  })
+  if (!range) toast(t('previewSelectionUnmapped'), 'warn', 4200)
+}
+
 export function updateCursor(id, cursor) {
   const updated = replaceDoc(id, { cursor })
   if (updated) emit({ docs: updated.docs })
 }
 
 export function setPreview(id, preview) {
-  const updated = replaceDoc(id, { preview })
+  const updated = replaceDoc(id, doc => {
+    const patch = { preview }
+    if (!preview && doc.selection?.source === 'preview') {
+      patch.selection = { from: 0, to: 0, text: '', coords: null }
+    }
+    return { ...doc, ...patch }
+  })
   if (updated) emit({ docs: updated.docs })
 }
 
@@ -805,11 +866,13 @@ export function closeAI() {
 
 export function setAIInstruction(value) {
   state.ai.instruction = value
+  if (String(value || '').trim() !== '') state.ai.action = 'custom'
   emit({})
 }
 
 export function setAIAction(action) {
   state.ai.action = action
+  if (action !== 'custom') state.ai.instruction = ''
   emit({})
 }
 
@@ -874,15 +937,21 @@ export async function runAI(action, options = {}) {
     toast(t('noSelection'), 'warn')
     return
   }
-  if (action === 'custom' && !(options.instruction !== undefined ? options.instruction : state.ai.instruction).trim()) {
+  if (scope === 'selection' && selection.from < 0) {
+    toast(t('previewSelectionUnmapped'), 'warn', 4200)
+    return
+  }
+  const instruction = options.instruction !== undefined ? options.instruction : state.ai.instruction
+  const effectiveAction = action === 'custom' || String(instruction || '').trim() !== '' ? 'custom' : action
+  if (effectiveAction === 'custom' && !String(instruction || '').trim()) {
     toast('请填写自定义修改要求。', 'warn')
     return
   }
   if (state.ai.loading) return
   const controller = new AbortController()
   const request = {
-    action,
-    instruction: options.instruction !== undefined ? options.instruction : state.ai.instruction,
+    action: effectiveAction,
+    instruction,
     scope,
     docId: doc.id,
     from: scope === 'document' ? 0 : selection.from,
@@ -900,7 +969,7 @@ export async function runAI(action, options = {}) {
   emit({})
   try {
     const result = await api('/ai', {
-      action,
+      action: effectiveAction,
       instruction: request.instruction,
       scope,
       documentText: request.documentText,
@@ -915,7 +984,7 @@ export async function runAI(action, options = {}) {
       to: request.to,
       before: request.before,
       after: result.text,
-      action,
+      action: effectiveAction,
       scope,
       request,
       baseContent: request.documentText,
@@ -924,6 +993,7 @@ export async function runAI(action, options = {}) {
     }
     state.ai.loading = false
     state.ai.controller = null
+    state.ai.open = true
     emit({ review })
   } catch (error) {
     state.ai.loading = false
@@ -1111,6 +1181,7 @@ export async function runBatch() {
     )
     state.ai.loading = false
     state.ai.controller = null
+    state.ai.open = true
     emit({
       review: {
         kind: 'batch',

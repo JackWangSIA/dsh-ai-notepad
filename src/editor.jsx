@@ -22,12 +22,15 @@ import {
   redo,
 } from '@codemirror/commands'
 import { searchKeymap, highlightSelectionMatches, openSearchPanel } from '@codemirror/search'
+import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
+import { html } from '@codemirror/lang-html'
 import {
   activeDoc,
   closeDoc,
   getState,
   openAI,
   openPath,
+  previewKind,
   saveDoc,
   setContextMenu,
   setPreview,
@@ -69,9 +72,16 @@ const annotationField = StateField.define({
   provide(field) { return EditorView.decorations.from(field) },
 })
 
+function languageFor(doc) {
+  const name = String(doc?.name || doc?.path || '').toLowerCase()
+  return /\.(html?|htm)$/.test(name) ? html() : []
+}
+
 function createState(doc, settings) {
   const extensions = [
     highlightSpecialChars(),
+    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    languageFor(doc),
     history(),
     drawSelection(),
     dropCursor(),
@@ -87,10 +97,10 @@ function createState(doc, settings) {
       { key: 'Mod-Shift-s', preventDefault: true, run: () => { saveDoc(getState().activeId, { saveAs: true }); return true } },
       { key: 'Mod-w', preventDefault: true, run: () => { closeDoc(getState().activeId); return true } },
       { key: 'Mod-Alt-a', preventDefault: true, run: () => { openAI(); return true } },
-      { key: 'Mod-Alt-1', preventDefault: true, run: () => { runAI('concise'); return true } },
-      { key: 'Mod-Alt-2', preventDefault: true, run: () => { runAI('polish'); return true } },
-      { key: 'Mod-Alt-3', preventDefault: true, run: () => { runAI('expand'); return true } },
-      { key: 'Mod-Alt-4', preventDefault: true, run: () => { runAI('proofread'); return true } },
+      { key: 'Mod-Alt-1', preventDefault: true, run: () => { runAI('concise', { instruction: '' }); return true } },
+      { key: 'Mod-Alt-2', preventDefault: true, run: () => { runAI('polish', { instruction: '' }); return true } },
+      { key: 'Mod-Alt-3', preventDefault: true, run: () => { runAI('expand', { instruction: '' }); return true } },
+      { key: 'Mod-Alt-4', preventDefault: true, run: () => { runAI('proofread', { instruction: '' }); return true } },
       { key: 'Mod-Alt-b', preventDefault: true, run: () => { addAnnotation(); return true } },
       { key: 'Mod-y', preventDefault: true, run: redo },
       {
@@ -98,7 +108,7 @@ function createState(doc, settings) {
         preventDefault: true,
         run: () => {
           const doc = activeDoc()
-          if (!doc || !/\.(md|markdown|mdx)$/i.test(doc.name || '')) return false
+          if (!doc || !previewKind(doc)) return false
           setPreview(doc.id, !doc.preview)
           return true
         },

@@ -59,6 +59,53 @@ test('selection AI review only changes the selected range after acceptance', asy
   }
 })
 
+test('preview selections map back to source offsets', () => {
+  store.newFile()
+  const doc = store.activeDoc()
+  store.updateDocContent(doc.id, 'before Hello after', null, null, { line: 1, column: 1 })
+  store.setPreviewSelection('Hello')
+  assert.equal(store.activeDoc().selection.from, 7)
+  assert.equal(store.activeDoc().selection.to, 12)
+  assert.equal(store.activeDoc().selection.source, 'preview')
+  store.setPreviewSelection('not in source')
+  assert.equal(store.activeDoc().selection.from, -1)
+  assert.equal(store.activeDoc().selection.unmapped, true)
+})
+
+test('typing a custom instruction cannot combine with a preset action', async () => {
+  const originalFetch = globalThis.fetch
+  let requestBody = null
+  globalThis.fetch = async (url, init) => {
+    requestBody = JSON.parse(init.body)
+    return new Response(JSON.stringify({ ok: true, text: 'Formal hello', provider: 'test', model: 'test' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+  try {
+    store.newFile()
+    let doc = store.activeDoc()
+    store.updateDocContent(doc.id, 'Hello world', null, { from: 0, to: 5, text: 'Hello', coords: null }, { line: 1, column: 1 })
+    store.setAIAction('polish')
+    store.setAIInstruction('make it formal')
+    assert.equal(store.getState().ai.action, 'custom')
+    await store.runAI('polish')
+    assert.equal(requestBody.action, 'custom')
+    assert.equal(requestBody.instruction, 'make it formal')
+    store.clearReview()
+    store.setAIAction('concise')
+    assert.equal(store.getState().ai.instruction, '')
+    doc = store.activeDoc()
+    store.updateDocContent(doc.id, 'Hello world', null, { from: 0, to: 5, text: 'Hello', coords: null }, { line: 1, column: 1 })
+    await store.runAI('concise')
+    assert.equal(requestBody.action, 'concise')
+    assert.equal(requestBody.instruction, '')
+  } finally {
+    store.clearReview()
+    globalThis.fetch = originalFetch
+  }
+})
+
 test('batch annotations apply every reviewed region in one undoable edit', async () => {
   const originalFetch = globalThis.fetch
   globalThis.fetch = async (url) => {

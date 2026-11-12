@@ -12,6 +12,7 @@ import {
   readDocument,
   writeDocument,
   apply,
+  _internals,
 } from '../lib/index.js'
 
 async function tempDir() {
@@ -199,12 +200,59 @@ test('host routes expose read/write, AI, batch and inbox operations', async () =
     assert.equal(enqueue.json.rev > 0, true)
     const inbox = await call('/inbox?since=0')
     assert.ok(inbox.json.files.some(item => item.path === file))
+
+    const site = path.join(dir, 'site')
+    const assets = path.join(site, 'assets')
+    await fs.mkdir(assets, { recursive: true })
+    const css = path.join(assets, 'theme.css')
+    const image = path.join(assets, 'bg.png')
+    await fs.writeFile(css, 'body{background:url("./bg.png")}')
+    await fs.writeFile(image, Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+    const preview = await call('/preview-html', {
+      html: '<link rel="stylesheet" href="./assets/theme.css"><img src="./assets/bg.png">',
+      basePath: path.join(site, 'index.html'),
+    })
+    assert.match(preview.json.html, /\/api\/ai-notepad\/asset\?path=/)
+    assert.ok(preview.json.html.includes(encodeURIComponent(css)))
+
+    const assetRoute = routes.get('/api/ai-notepad/asset')
+    assert.ok(assetRoute)
+    const assetResponse = await assetRoute.fetch(new Request('http://127.0.0.1/api/ai-notepad/asset?path=' + encodeURIComponent(css)))
+    assert.match(assetResponse.headers.get('content-type') || '', /text\/css/)
+    assert.ok((await assetResponse.text()).includes(encodeURIComponent(image)))
   } finally {
     await cleanup()
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
     await fs.rm(dir, { recursive: true, force: true })
   }
+})
+
+test('custom instructions never combine with a preset action', () => {
+  const custom = _internals.buildSelectionPrompt({
+    action: 'custom',
+    instruction: '改成正式语气',
+    documentText: 'Hello world',
+    selectedText: 'Hello',
+    before: '',
+    after: ' world',
+  })
+  assert.match(custom, /改成正式语气/)
+  assert.doesNotMatch(custom, /润色/)
+  const preset = _internals.buildSelectionPrompt({
+    action: 'polish',
+    instruction: '这一句不应出现',
+    documentText: 'Hello world',
+    selectedText: 'Hello',
+    before: '',
+    after: ' world',
+  })
+  assert.doesNotMatch(preset, /这一句不应出现/)
+  const trailing = '\n\nThis is the following paragraph that should not be copied.'
+  assert.equal(
+    _internals.trimSelectionLeak('Hello there' + trailing, { after: trailing }),
+    'Hello there',
+  )
 })
 
 test('VBS launcher writes a queue that the Host inbox consumes', async () => {

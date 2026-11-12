@@ -19,6 +19,13 @@ AI Notepad is a local-first DeepSeek Harness plugin. It reads and writes files c
 - Writes are atomic via a temporary file in the target directory.
 - UTF-8, UTF-8 BOM, UTF-16 LE/BE, GB18030 and Windows-1252 are preserved. Lossy GB18030/Windows-1252 writes are refused.
 
+## HTML preview
+
+- HTML is rendered in a sandboxed iframe without `allow-scripts`; scripts, forms and popups are blocked.
+- Relative assets are served through the authenticated `/api/ai-notepad/asset` route, limited to files explicitly referenced by the preview. The route serves local assets with `cache-control: no-store` and `x-content-type-options: nosniff`.
+- Preview asset paths are resolved from the opened HTML file's directory, so relative CSS and images work without exposing the Harness application origin to the page.
+- HTML preview is a reading surface, not a browser: JavaScript-driven pages render their static fallback only.
+
 ## Windows associations
 
 - All registry writes are under `HKCU` and require no administrator rights.

@@ -2,6 +2,15 @@
 
 All notable changes to AI Notepad are documented here.
 
+## 1.2.0 — 2026-11-12
+
+- Added Linux/macOS native open/save dialogs (zenity, kdialog, yad, osascript) and cross-platform font discovery, reveal-in-file-manager and graceful association fallbacks.
+- Made HTML a first-class document type: HTML preview, CodeMirror HTML syntax highlighting, and `Ctrl+E` preview/edit.
+- Reworked HTML preview resource loading: relative CSS, images, fonts and CSS `url()` references are rewritten through an authenticated local asset route instead of resolving against the Harness app URL.
+- Replaced the blocking Diff modal with a docked review panel that leaves the editor visible and preserves its scroll position; review opens beside the document.
+- Isolated custom instructions from preset actions in both the client and Host prompts, and added output-boundary cleanup for selection rewrites.
+- Preview selections in Markdown and HTML can now be mapped back to source offsets and sent to selection AI.
+
 ## 1.1.8 — 2026-10-31
 
 - Added the **About** panel beside File and View with version, build/update time, feature overview, shortcuts, runtime information, recent updates, usage boundaries and one-click version-info copy.
