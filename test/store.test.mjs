@@ -11,6 +11,10 @@ Object.defineProperty(globalThis, 'navigator', {
   value: { language: 'zh-CN', clipboard: { writeText: async () => {} } },
   configurable: true,
 })
+Object.defineProperty(globalThis, 'window', {
+  value: { confirm: () => true },
+  configurable: true,
+})
 
 const store = await import('../src/store.js')
 
@@ -184,31 +188,29 @@ test('a heading replacement does not gain a second hash marker', async () => {
   }
 })
 
-test('batch annotations apply every reviewed region in one undoable edit', async () => {
+test('every AI modification is kept in history and can be rolled back', async () => {
   const originalFetch = globalThis.fetch
-  globalThis.fetch = async (url) => {
-    assert.match(String(url), /\/api\/ai-notepad\/ai-batch$/)
-    return new Response(JSON.stringify({ ok: true, replacements: [{ id: 0, replacement: 'Hi' }, { id: 1, replacement: 'Earth' }] }), {
+  let step = 0
+  globalThis.fetch = async () => {
+    step += 1
+    return new Response(JSON.stringify({ ok: true, text: step === 1 ? 'One' : 'Two', provider: 'test', model: 'test' }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
     })
   }
   try {
+    store.getState().history = []
     store.newFile()
-    let doc = store.activeDoc()
-    store.updateDocContent(doc.id, 'Hello world', null, { from: 0, to: 5, text: 'Hello', coords: null }, { line: 1, column: 1 })
-    store.setAIInstruction('make it short')
-    store.addAnnotation()
-    store.updateDocContent(doc.id, 'Hello world', null, { from: 6, to: 11, text: 'world', coords: null }, { line: 1, column: 1 })
-    store.setAIInstruction('use the planet name')
-    store.addAnnotation()
-    doc = store.activeDoc()
-    assert.equal(doc.annotations.length, 2)
-    await store.runBatch()
-    assert.equal(store.getState().review.kind, 'batch')
-    store.acceptReview()
-    assert.equal(store.activeDoc().content, 'Hi Earth')
-    assert.equal(store.activeDoc().annotations.length, 0)
+    const doc = store.activeDoc()
+    store.updateDocContent(doc.id, 'First', null, null, { line: 1, column: 1 })
+    await store.runAI('polish', { scope: 'document' })
+    await store.runAI('polish', { scope: 'document' })
+    assert.equal(store.activeDoc().content, 'Two')
+    assert.equal(store.getState().history.length, 2)
+    const first = store.getState().history[0]
+    store.revertHistory(first.id)
+    assert.equal(store.activeDoc().content, 'First')
+    assert.equal(store.getState().history.length, 0)
   } finally {
     globalThis.fetch = originalFetch
   }

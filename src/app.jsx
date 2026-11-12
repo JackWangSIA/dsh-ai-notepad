@@ -2,7 +2,6 @@ import React from 'react'
 import {
   activateDoc,
   activeDoc,
-  addAnnotation,
   api,
   cancelAI,
   closeDoc,
@@ -23,12 +22,10 @@ import {
   pickOpen,
   persistSettings,
   reloadDoc,
-  removeAnnotation,
   removeAssociations,
   resetSettings,
   restoreAssociations,
   runAI,
-  runBatch,
   saveDoc,
   setAssociationOpen,
   setSettingsOpen,
@@ -52,6 +49,10 @@ import {
   openReview,
   closeReview,
   revertLastChange,
+  openHistory,
+  closeHistory,
+  openHistoryReview,
+  revertHistory,
 } from './store.js'
 import { NotepadEditor } from './editor.jsx'
 import { lineDiff, compactDiff } from './diff.js'
@@ -73,7 +74,6 @@ import {
   CheckIcon,
   ReloadIcon,
   WarnIcon,
-  TrashIcon,
   ChevronDownIcon,
   SearchIcon,
   InfoIcon,
@@ -364,6 +364,10 @@ function AIPanel({ doc }) {
   if (state.reviewOpen && state.review && state.review.docId === doc.id) {
     return h('aside', { className: 'np-ai np-ai-review', 'aria-label': t('reviewDock') }, h(ReviewPanel, { review: state.review }))
   }
+  if (state.historyOpen) {
+    return h('aside', { className: 'np-ai np-ai-review', 'aria-label': t('history') }, h(HistoryPanel, { doc }))
+  }
+  const docHistory = state.history.filter(item => item.docId === doc.id)
   const selection = doc.selection
   const hasSelection = !!(selection && selection.text)
   const mappable = hasSelection && selection.from >= 0
@@ -381,6 +385,13 @@ function AIPanel({ doc }) {
   return h('aside', { className: 'np-ai', 'aria-label': t('aiEdit') },
     h('div', { className: 'np-ai-head' },
       h('div', { className: 'np-ai-title' }, h(SparkIcon, { size: 16 }), t('aiEdit')),
+      h('button', {
+        type: 'button',
+        className: 'np-btn np-sm np-outline',
+        disabled: docHistory.length === 0,
+        onClick: () => openHistory(),
+        title: t('history'),
+      }, t('history'), docHistory.length ? h('span', { className: 'np-badge' }, docHistory.length) : null),
       h(IconButton, { title: t('close'), onClick: () => closeAI() }, h(CloseIcon, { size: 14 })),
     ),
     h('div', { className: 'np-ai-body' },
@@ -428,20 +439,12 @@ function AIPanel({ doc }) {
             disabled: !mappable || state.ai.loading,
             onClick: () => run(state.ai.action, 'selection'),
           }, state.ai.loading ? h('span', { className: 'np-spin' }) : h(SparkIcon, { size: 14 }), t('run')),
-          h('button', {
-            type: 'button',
-            className: 'np-btn np-outline',
-            disabled: !mappable || state.ai.loading,
-            onClick: () => addAnnotation(),
-            title: 'Ctrl+Alt+B',
-          }, t('addAnnotation')),
         ),
         state.ai.error ? h('div', { className: 'np-error' }, state.ai.error) : null,
       ),
       h('div', { className: 'np-ai-section' },
         h('div', { className: 'np-row' },
           h('p', { className: 'np-ai-label', style: { flex: 1, margin: 0 } }, t('fullDocument')),
-          h('span', { className: 'np-badge' }, t('fullOnly')),
         ),
         h('div', { className: 'np-actions', style: { marginTop: 6 } }, fullActions.map(([key, label]) => h('button', {
           type: 'button',
@@ -450,31 +453,6 @@ function AIPanel({ doc }) {
           disabled: state.ai.loading,
           onClick: () => run(key, 'document'),
         }, label))),
-      ),
-      h('div', { className: 'np-ai-section' },
-        h('div', { className: 'np-row' },
-          h('p', { className: 'np-ai-label', style: { flex: 1, margin: 0 } }, t('annotations')),
-          h('span', { className: 'np-badge' }, doc.annotations.length),
-        ),
-        doc.annotations.length === 0
-          ? h('p', { className: 'np-hint' }, t('noAnnotations'))
-          : h('div', { style: { marginTop: 6 } }, doc.annotations.map(annotation => h('div', { className: 'np-ann', key: annotation.id },
-            h('div', { className: 'np-ann-top' },
-              h('span', { className: 'np-badge' }, annotation.quote.length + ' ' + t('chars')),
-              h(IconButton, { title: t('close'), onClick: () => removeAnnotation(annotation.id) }, h(TrashIcon, { size: 13 })),
-            ),
-            h('div', { className: 'np-ann-quote' }, annotation.quote),
-            h('div', { className: 'np-ann-note' }, annotation.instruction),
-          ))),
-        h('div', { className: 'np-row', style: { marginTop: 8 } },
-          h('button', {
-            type: 'button',
-            className: 'np-btn np-primary',
-            style: { flex: 1 },
-            disabled: doc.annotations.length === 0 || state.ai.loading,
-            onClick: () => runBatch(),
-          }, t('batchRun')),
-        ),
       ),
     ),
     state.ai.loading ? h('div', { className: 'np-ai-footer' },
@@ -897,7 +875,6 @@ function SelectionContextMenu() {
     item(t('expand'), () => runAI('expand', { instruction: '' }), 'Ctrl+Alt+3'),
     item(t('proofread'), () => runAI('proofread', { instruction: '' }), 'Ctrl+Alt+4'),
     h('div', { className: 'np-menu-sep' }),
-    item(t('addAnnotation'), () => addAnnotation(), 'Ctrl+Alt+B'),
     item(t('copy'), () => copySelection()),
     item(t('openWith'), () => { if (doc?.path) api('/reveal', { path: doc.path }).catch(error => toast(error.message, 'error')) }),
   )
@@ -920,14 +897,14 @@ function ReviewPanel({ review }) {
   return h(React.Fragment, null,
     h('div', { className: 'np-ai-head np-review-head' },
       h(DiffIcon, { size: 16 }),
-      h('div', { className: 'np-ai-title' }, review.kind === 'batch' ? t('batchTitle') : t('reviewDock')),
+      h('div', { className: 'np-ai-title' }, t('reviewDock')),
       h(IconButton, { title: t('close'), onClick: autoApplied ? closeReview : clearReview }, h(CloseIcon, { size: 14 })),
     ),
     h('div', { className: 'np-review-body' },
       h('div', { className: 'np-diff-meta np-review-meta' },
         h('span', { className: 'np-diff-add' }, '+' + diff.stats.additions),
         h('span', { className: 'np-diff-del' }, '-' + diff.stats.deletions),
-        h('span', null, review.kind === 'batch' ? review.changes.length + ' 处修改' : (state.model ? `${state.model.provider}/${state.model.model}` : '')),
+        h('span', null, state.model ? `${state.model.provider}/${state.model.model}` : ''),
         diff.stats.truncated ? h('span', null, '（大规模修改）') : null,
       ),
       h('p', { className: 'np-hint np-review-hint' }, autoApplied ? t('reviewAppliedHint') : t('reviewDockHint')),
@@ -943,7 +920,7 @@ function ReviewPanel({ review }) {
     h('div', { className: 'np-review-actions' },
       h('p', { className: 'np-hint', style: { margin: 0 } }, autoApplied
         ? t('reviewAppliedHint')
-        : '只有点击「' + (review.kind === 'batch' ? t('acceptBatch') : t('accept')) + '」后才会写入编辑器；写入后可继续 Ctrl+Z 撤销。'),
+        : '只有点击「' + t('accept') + '」后才会写入编辑器；写入后可继续 Ctrl+Z 撤销。'),
       h('div', { className: 'np-row' },
         autoApplied
           ? h(React.Fragment, null,
@@ -957,18 +934,44 @@ function ReviewPanel({ review }) {
               className: 'np-btn np-outline',
               disabled: state.ai.loading,
               onClick: () => {
-                if (review.kind === 'batch') {
-                  clearReview()
-                  runBatch()
-                } else {
-                  clearReview()
-                  regenerate()
-                }
+                clearReview()
+                regenerate()
               },
             }, h(ReloadIcon, { size: 14 }), t('regenerate')),
-            h('button', { type: 'button', className: 'np-btn np-primary', style: { flex: 1 }, onClick: () => acceptReview() }, h(CheckIcon, { size: 14 }), review.kind === 'batch' ? t('acceptBatch') : t('accept')),
+            h('button', { type: 'button', className: 'np-btn np-primary', style: { flex: 1 }, onClick: () => acceptReview() }, h(CheckIcon, { size: 14 }), t('accept')),
           ),
       ),
+    ),
+  )
+}
+
+function HistoryPanel({ doc }) {
+  const state = useNotepad()
+  const items = state.history.filter(item => item.docId === doc.id).slice().reverse()
+  return h(React.Fragment, null,
+    h('div', { className: 'np-ai-head np-review-head' },
+      h(DiffIcon, { size: 16 }),
+      h('div', { className: 'np-ai-title' }, t('history')),
+      h(IconButton, { title: t('close'), onClick: closeHistory }, h(CloseIcon, { size: 14 })),
+    ),
+    h('div', { className: 'np-history-body' },
+      h('p', { className: 'np-hint np-review-hint' }, t('historyHint')),
+      items.length === 0
+        ? h('p', { className: 'np-hint' }, t('historyEmpty'))
+        : items.map(item => h('div', { className: 'np-history-item', key: item.id },
+          h('div', { className: 'np-history-top' },
+            h('span', { className: 'np-history-action' }, t(item.action || 'custom')),
+            h('span', { className: 'np-history-time' }, new Date(item.at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
+          ),
+          h('div', { className: 'np-history-meta' },
+            h('span', { className: 'np-diff-add' }, '+' + (item.stats?.additions || 0)),
+            h('span', { className: 'np-diff-del' }, '-' + (item.stats?.deletions || 0)),
+          ),
+          h('div', { className: 'np-history-actions' },
+            h('button', { type: 'button', className: 'np-btn np-sm np-outline', onClick: () => openHistoryReview(item.id) }, t('viewChange')),
+            h('button', { type: 'button', className: 'np-btn np-sm np-danger', onClick: () => revertHistory(item.id) }, t('rollback')),
+          ),
+        )),
     ),
   )
 }
@@ -1227,7 +1230,6 @@ function AboutModal() {
     { icon: EditIcon, title: t('featureEditTitle'), desc: t('featureEditDesc') },
     { icon: SparkIcon, title: t('featureSelectionTitle'), desc: t('featureSelectionDesc') },
     { icon: DiffIcon, title: t('featureDocumentTitle'), desc: t('featureDocumentDesc') },
-    { icon: CopyIcon, title: t('featureAnnotationTitle'), desc: t('featureAnnotationDesc') },
     { icon: EyeIcon, title: t('featurePreviewTitle'), desc: t('featurePreviewDesc') },
     { icon: LinkIcon, title: t('featureAssocTitle'), desc: t('featureAssocDesc') },
     { icon: ReloadIcon, title: t('featureModelTitle'), desc: t('featureModelDesc') },
@@ -1240,7 +1242,6 @@ function AboutModal() {
     ['Ctrl+E', t('togglePreview')],
     ['Ctrl+滚轮', t('fontSize')],
     ['Ctrl+Alt+1…4', t('selection') + ' AI'],
-    ['Ctrl+Alt+B', t('addAnnotation')],
   ]
   const infoText = [
     `AI Notepad v${PLUGIN_VERSION}`,

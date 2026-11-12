@@ -49,8 +49,7 @@ On DSH Desktop, prefer **Plugins → Add plugin** with the repository URL. The `
 - Selection-scoped AI editing: concise, polish, expand, restructure, proofread, or a custom instruction. `Enter` runs the instruction, `Shift+Enter` inserts a newline, and the prompt clears after each run.
 - AI changes apply immediately. The rail keeps a **Review change** / **Revert change** action for the last result; review shows the diff without blocking the editor, and revert restores the previous text. `Ctrl+Z` remains available.
 - Whole-document AI: polish, concise, summarize, outline and title generation.
-- A docked diff review is available from the rail for the last selection change; the editor stays visible and keeps its scroll position. Batch annotations still use a review panel before applying.
-- Multiple annotations can be collected and sent in one batch; every reviewed region is validated against the original document before a single undoable edit.
+- Every AI change is kept in a per-document history. Open **Change history** in the rail to view any diff or revert to the content before that change. Reverting an older change also discards the later changes for that document.
 - Markdown and HTML files open directly in preview mode. Markdown preview escapes raw HTML and uses a conservative CommonMark subset. HTML files are first-class too, with CodeMirror HTML syntax highlighting and a sandboxed HTML preview. **Ctrl+E** toggles preview/edit; double-clicking the preview also returns to the editor. A floating preview toolbar shows the mode and the shortcut.
 - HTML previews load saved files through the authenticated asset route (instead of copying the full document through JSON), rewrite CSS/image references once per file, and briefly cache preview assets. Right-click an image and choose **Copy original image** to put it on the clipboard.
 - HTML preview rewrites relative `href` / `src` / `srcset`, inline CSS and linked CSS `url()` references through an authenticated local asset route, so `../../theme.css`, images and fonts resolve from the HTML file's directory instead of the Harness app URL. Scripts remain blocked in the preview.
@@ -73,7 +72,6 @@ On DSH Desktop, prefer **Plugins → Add plugin** with the repository URL. The `
 | `Ctrl+E` | Toggle Markdown / HTML preview / edit |
 | `Ctrl+wheel`, `Ctrl+=`, `Ctrl+-`, `Ctrl+0` | Font zoom in / out / reset |
 | `Ctrl+Alt+1..4` | Selection concise / polish / expand / proofread |
-| `Ctrl+Alt+B` | Add annotation |
 | `Ctrl+Alt+N` | Focus AI Notepad from the main shell |
 
 ![AI Notepad About panel](assets/screenshot-about.png)
@@ -99,7 +97,7 @@ The desktop shell has a single-instance lock but currently ignores file paths in
 - `lib/client.js` — generated classic ModuleLoader bundle (React and `react/jsx-runtime` stay external).
 - `lib/scripts/` — native file pickers, font enumeration and the Windows external-open launcher.
 - `scripts/build.mjs` — esbuild bundle step.
-- `test/` — Host route/integration tests, encoding tests, VBS→inbox test, store AI/batch tests, ModuleLoader load test, and server-render tests for app/review/preview.
+- `test/` — Host route/integration tests, encoding tests, VBS→inbox test, store AI/history tests, ModuleLoader load test, and server-render tests for app/review/preview.
 
 ## Build and install
 

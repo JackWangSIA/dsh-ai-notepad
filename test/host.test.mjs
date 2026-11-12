@@ -106,7 +106,7 @@ test('rejects stale writes and binary open', async () => {
   }
 })
 
-test('host routes expose read/write, AI, batch and inbox operations', async () => {
+test('host routes expose read/write, AI and inbox operations', async () => {
   const dir = await tempDir()
   const previousHome = process.env.DSH_HOME
   process.env.DSH_HOME = dir
@@ -189,12 +189,6 @@ test('host routes expose read/write, AI, batch and inbox operations', async () =
       after: '',
     })
     assert.equal(ai.json.text, 'REWRITTEN')
-
-    const batch = await call('/ai-batch', {
-      documentText: 'A\nB',
-      annotations: [{ id: 0, action: 'custom', instruction: 'replace', quote: 'B' }],
-    })
-    assert.deepEqual(batch.json.replacements, [{ id: 0, replacement: 'B' }])
 
     const enqueue = await call('/enqueue', { paths: [file] })
     assert.equal(enqueue.json.rev > 0, true)

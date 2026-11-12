@@ -48,13 +48,17 @@ AI Notepad 不是完整的 IDE，也不是一个只支持 Markdown 的预览器�
 - 纠错
 - 自定义要求（`Enter` 运行，`Shift+Enter` 换行）
 
-AI 只输出选中区域的替换文本；运行后直接应用。右侧保留**回看修改**和**退回修改**，回看显示非模态 Diff 且不改变编辑器滚动位置；退回可恢复原文，`Ctrl+Z` 也仍然可用。多处批注仍在应用前进入审阅栏。
+AI 只输出选中区域的替换文本；运行后直接应用。右侧保留**回看修改**和**退回修改**，回看显示非模态 Diff 且不改变编辑器滚动位置；退回可恢复原文，`Ctrl+Z` 也仍然可用。
 
-### 全文与批注
+### 修改历史
+
+- 每次 AI 修改都会保存到当前文档的历史列表。
+- 可查看任意一次修改的 Diff。
+- 可回退到某次修改前；如果之后还有修改，会先确认，并撤销之后的修改。
+
+### 全文处理
 
 - 全文润色、全文精简、内容总结、逻辑梳理、生成标题。
-- 对多个区域分别写批注，最后统一交给 AI 处理。
-- 批量修改逐段校验原文，再以一个可撤销事务应用。
 
 ### Markdown / HTML
 
@@ -104,7 +108,6 @@ AI 只输出选中区域的替换文本；运行后直接应用。右侧保留**
 | `Ctrl+E` | 切换 Markdown / HTML 预览 / 编辑 |
 | `Ctrl+滚轮`、`Ctrl+=`、`Ctrl+-`、`Ctrl+0` | 放大 / 缩小 / 恢复字号 |
 | `Ctrl+Alt+1..4` | 选区精简 / 润色 / 扩写 / 纠错 |
-| `Ctrl+Alt+B` | 加入批注 |
 | `Ctrl+Alt+N` | 从主界面切换到 AI Notepad |
 
 ## 安装
@@ -148,7 +151,7 @@ $pnpm = "$env:USERPROFILE\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\pnp
 - `lib/client.js` — 构建后的经典 ModuleLoader bundle；React 由 Harness 页面提供。
 - `lib/scripts/` — Windows 文件选择器、字体枚举、外部文件启动器。
 - `scripts/build.mjs` — esbuild 构建并注入版本/构建时间。
-- `test/` — Host 路由、编码、VBS→inbox、AI、批注、客户端加载与 SSR 测试。
+- `test/` — Host 路由、编码、VBS→inbox、AI、修改历史、客户端加载与 SSR 测试。
 
 ## 限制与安全
 

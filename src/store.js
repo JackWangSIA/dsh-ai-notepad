@@ -55,12 +55,6 @@ const MESSAGES = {
     reviewTitle: 'AI 修改对比',
     diffBefore: '原文',
     diffAfter: '修改后',
-    selectionOnly: '仅替换选中区域',
-    fullOnly: '替换全文',
-    addAnnotation: '加入批注',
-    annotations: '多处批注',
-    batchRun: '统一处理批注',
-    noAnnotations: '还没有批注。选中文字并写下修改要求。',
     instruction: '修改要求（可选）',
     customPlaceholder: '例如：改成更正式的语气，保留所有数字和引用……',
     loading: 'AI 正在处理…',
@@ -81,6 +75,13 @@ const MESSAGES = {
     revertChange: '退回修改',
     reverted: '已退回本次修改',
     revertBlocked: '文档内容已变化，无法精确退回；请使用 Ctrl+Z',
+    history: '修改历史',
+    historyEmpty: '还没有 AI 修改记录。',
+    historyHint: '每次 AI 修改都会保留在这里；回退会恢复到该次修改前。',
+    historyConfirm: '回退到此次修改前会丢弃它之后的修改，继续吗？',
+    historyRolledBack: '已回退到此次修改前',
+    viewChange: '查看',
+    rollback: '回退',
     noPath: '新文件还没有路径',
     dirty: '未保存',
     chars: '字符',
@@ -131,8 +132,6 @@ const MESSAGES = {
     featureSelectionDesc: '只改选中区域，应用后可回看或退回',
     featureDocumentTitle: '全文 AI',
     featureDocumentDesc: '润色、精简、总结、梳理结构、生成标题',
-    featureAnnotationTitle: '多处批注',
-    featureAnnotationDesc: '逐段提要求，最后一次性统一处理',
     featurePreviewTitle: 'Markdown / HTML 预览',
     featurePreviewDesc: 'Markdown 与 HTML 预览，相对 CSS/图片可加载',
     featureAssocTitle: '跨平台原生集成',
@@ -201,9 +200,6 @@ const MESSAGES = {
     aiError: 'AI 处理失败',
     modelUnavailable: '没有可用的默认模型，请先在 Harness 设置中选择模型。',
     selectionChanged: '内容在 AI 处理期间已被修改，已取消替换。',
-    batchInvalid: '批注区域已变化，请重新加入批注。',
-    acceptBatch: '接受全部修改',
-    batchTitle: '批量批注对比',
     conflictSaved: '已保留本地内容，请另存为',
   },
   en: {
@@ -242,12 +238,6 @@ const MESSAGES = {
     reviewTitle: 'AI change review',
     diffBefore: 'Before',
     diffAfter: 'After',
-    selectionOnly: 'Replaces the selection only',
-    fullOnly: 'Replaces the whole document',
-    addAnnotation: 'Add annotation',
-    annotations: 'Annotations',
-    batchRun: 'Process annotations',
-    noAnnotations: 'No annotations yet. Select text and write an instruction.',
     instruction: 'Instruction (optional)',
     customPlaceholder: 'e.g. make the tone more formal and keep every number and citation…',
     loading: 'AI is working…',
@@ -268,6 +258,13 @@ const MESSAGES = {
     revertChange: 'Revert change',
     reverted: 'Change reverted',
     revertBlocked: 'The document changed, so it cannot be reverted precisely; use Ctrl+Z',
+    history: 'Change history',
+    historyEmpty: 'No AI changes yet.',
+    historyHint: 'Every AI change is kept here; reverting restores the content before that change.',
+    historyConfirm: 'Reverting to before this change discards the changes after it. Continue?',
+    historyRolledBack: 'Reverted to before this change',
+    viewChange: 'View',
+    rollback: 'Revert',
     noPath: 'This new file has no path yet',
     dirty: 'Unsaved',
     chars: 'chars',
@@ -318,8 +315,6 @@ const MESSAGES = {
     featureSelectionDesc: 'Only the selection changes; review or revert after applying',
     featureDocumentTitle: 'Document AI',
     featureDocumentDesc: 'Polish, condense, summarize, outline, titles',
-    featureAnnotationTitle: 'Annotations',
-    featureAnnotationDesc: 'Collect instructions, process them together',
     featurePreviewTitle: 'Markdown / HTML preview',
     featurePreviewDesc: 'Markdown and HTML preview with relative CSS and images',
     featureAssocTitle: 'Cross-platform native integration',
@@ -388,9 +383,6 @@ const MESSAGES = {
     aiError: 'AI failed',
     modelUnavailable: 'No default model is configured. Choose one in Harness settings.',
     selectionChanged: 'The content changed while AI was working; the replacement was cancelled.',
-    batchInvalid: 'Annotation ranges changed. Please add them again.',
-    acceptBatch: 'Accept all changes',
-    batchTitle: 'Batch annotation review',
     conflictSaved: 'Local content kept; save as a new file',
   },
 }
@@ -465,7 +457,6 @@ function newDoc(name) {
     hash: null,
     size: 0,
     mtimeMs: 0,
-    annotations: [],
     preview: false,
     conflict: false,
     selection: { from: 0, to: 0, text: '', coords: null },
@@ -497,6 +488,8 @@ const state = {
   },
   review: null,
   reviewOpen: false,
+  history: [],
+  historyOpen: false,
   settingsOpen: false,
   aboutOpen: false,
   associationOpen: false,
@@ -1211,12 +1204,41 @@ export function clearReview() {
   emit({ review: null, reviewOpen: false })
 }
 
+const MAX_HISTORY_ENTRIES = 40
+const MAX_HISTORY_BYTES = 64 * 1024 * 1024
+
+function pushHistory(change) {
+  state.history.push(change)
+  while (state.history.length > MAX_HISTORY_ENTRIES) state.history.shift()
+  let bytes = state.history.reduce((total, item) => total
+    + String(item.beforeContent || '').length
+    + String(item.afterContent || '').length, 0)
+  while (bytes > MAX_HISTORY_BYTES && state.history.length > 1) {
+    const removed = state.history.shift()
+    bytes -= String(removed.beforeContent || '').length + String(removed.afterContent || '').length
+  }
+}
+
 export function openReview() {
   if (state.review) emit({ reviewOpen: true })
 }
 
 export function closeReview() {
   emit({ reviewOpen: false })
+}
+
+export function openHistory() {
+  emit({ historyOpen: true, reviewOpen: false })
+}
+
+export function closeHistory() {
+  emit({ historyOpen: false })
+}
+
+export function openHistoryReview(id) {
+  const record = state.history.find(item => item.id === id)
+  if (!record) return
+  emit({ review: record, reviewOpen: true, historyOpen: false })
 }
 
 function normalizeSelectionOutput(selected, output) {
@@ -1284,11 +1306,14 @@ export async function runAI(action, options = {}) {
     const change = {
       kind: 'single',
       autoApplied: true,
+      id: 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      at: Date.now(),
       docId: doc.id,
       from: request.from,
       to: request.to,
       before: request.before,
       after,
+      beforeContent: request.documentText,
       afterContent: request.documentText.slice(0, request.from) + after + request.documentText.slice(request.to),
       action: effectiveAction,
       scope,
@@ -1306,8 +1331,10 @@ export async function runAI(action, options = {}) {
     state.ai.loading = false
     state.ai.controller = null
     state.ai.open = true
+    pushHistory(change)
     state.review = change
     state.reviewOpen = false
+    state.historyOpen = false
     emit({})
     toast(t('aiApplied'), 'success', 2800)
   } catch (error) {
@@ -1366,9 +1393,43 @@ function applySingleChange(change) {
   return true
 }
 
+export function revertHistory(id) {
+  const index = state.history.findIndex(item => item.id === id)
+  const change = index >= 0 ? state.history[index] : null
+  if (!change) return
+  const doc = state.docs.find(item => item.id === change.docId)
+  if (!doc) return
+  const later = state.history.some((item, at) => at > index && item.docId === doc.id)
+  const currentIsAfter = doc.content === change.afterContent
+  if (!currentIsAfter && !window.confirm(t('historyConfirm'))) return
+  const target = typeof change.beforeContent === 'string' ? change.beforeContent : null
+  if (target === null) {
+    toast(t('revertBlocked'), 'warn', 5000)
+    return
+  }
+  if (state.editorBridge && state.editorBridge.docId === doc.id) {
+    state.editorBridge.dispatchChange({ from: 0, to: doc.content.length, insert: target })
+  } else {
+    const updated = replaceDoc(doc.id, { content: target, cmState: null, dirty: target !== doc.savedContent })
+    if (updated) emit({ docs: updated.docs })
+  }
+  state.history = state.history.filter((item, at) => !(item.docId === doc.id && at >= index))
+  state.review = null
+  state.reviewOpen = false
+  state.historyOpen = false
+  state.ai.open = true
+  emit({})
+  toast(later ? t('historyRolledBack') : t('reverted'), 'success', 2200)
+}
+
 export function revertLastChange() {
   const change = state.review
-  if (!change || change.kind !== 'single') return
+  if (!change) return
+  if (change.id && state.history.some(item => item.id === change.id)) {
+    revertHistory(change.id)
+    return
+  }
+  if (change.kind !== 'single') return
   const doc = state.docs.find(item => item.id === change.docId)
   if (!doc) return
   const from = change.from
@@ -1415,164 +1476,13 @@ export function applyReplacement(docId, from, to, insert) {
 
 export function acceptReview() {
   const review = state.review
-  if (!review) return
-  if (review.kind === 'single') {
+  if (review?.kind === 'single') {
     applyReplacement(review.docId, review.from, review.to, review.after)
-    return
-  }
-  if (review.kind === 'batch') {
-    const changes = review.changes
-    if (!Array.isArray(changes) || changes.length === 0) return
-    const doc = state.docs.find(item => item.id === review.docId)
-    if (!doc) return
-    if (review.baseContent !== undefined && doc.content !== review.baseContent) {
-      toast(t('batchInvalid'), 'warn', 5000)
-      return
-    }
-    for (const change of changes) {
-      if (doc.content.slice(change.from, change.to) !== change.before) {
-        toast(t('batchInvalid'), 'warn', 5000)
-        return
-      }
-    }
-    const sorted = changes.slice().sort((a, b) => b.from - a.from)
-    const content = sorted.reduce((text, change) => text.slice(0, change.from) + change.after + text.slice(change.to), doc.content)
-    if (state.editorBridge && state.editorBridge.docId === review.docId) {
-      state.editorBridge.dispatchChanges(sorted.map(change => ({ from: change.from, to: change.to, insert: change.after })))
-      if (state.editorBridge.clearAnnotations) state.editorBridge.clearAnnotations()
-    } else {
-      const updated = replaceDoc(review.docId, { content, cmState: null, annotations: [], dirty: content !== doc.savedContent })
-      if (updated) emit({ docs: updated.docs })
-    }
-    emit({ review: null })
   }
 }
 
 export function registerEditorBridge(bridge) {
   state.editorBridge = bridge
-}
-
-export function addAnnotation() {
-  const doc = activeDoc()
-  if (!doc) return
-  const selection = doc.selection
-  if (!selection || !selection.text) {
-    toast(t('noSelection'), 'warn')
-    return
-  }
-  const instruction = state.ai.instruction.trim()
-  if (!instruction) {
-    toast('请先填写批注要求。', 'warn')
-    return
-  }
-  const annotation = {
-    id: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    from: selection.from,
-    to: selection.to,
-    quote: selection.text,
-    instruction,
-    action: 'custom',
-    createdAt: Date.now(),
-  }
-  const annotations = [...doc.annotations, annotation]
-  const updated = replaceDoc(doc.id, { annotations })
-  if (updated) emit({ docs: updated.docs })
-  state.ai.instruction = ''
-  emit({})
-  toast('已加入批注；继续选择其他区域，最后统一处理。', 'success', 2200)
-}
-
-export function removeAnnotation(id) {
-  const doc = activeDoc()
-  if (!doc) return
-  const annotations = doc.annotations.filter(item => item.id !== id)
-  const updated = replaceDoc(doc.id, { annotations })
-  if (updated) emit({ docs: updated.docs })
-}
-
-export async function runBatch() {
-  const doc = activeDoc()
-  if (!doc) return
-  const annotations = doc.annotations || []
-  if (annotations.length === 0) {
-    toast(t('noAnnotations'), 'warn')
-    return
-  }
-  for (const annotation of annotations) {
-    if (doc.content.slice(annotation.from, annotation.to) !== annotation.quote) {
-      toast(t('batchInvalid'), 'warn', 5000)
-      return
-    }
-  }
-  const ordered = annotations.slice().sort((a, b) => a.from - b.from)
-  for (let i = 1; i < ordered.length; i++) {
-    if (ordered[i].from < ordered[i - 1].to) {
-      toast('批注区域有重叠，请拆分为不同区域。', 'warn', 5000)
-      return
-    }
-  }
-  if (state.ai.loading) return
-  const controller = new AbortController()
-  state.ai.loading = true
-  state.ai.error = null
-  state.ai.controller = controller
-  emit({})
-  try {
-    const result = await api('/ai-batch', {
-      documentText: doc.content,
-      annotations: annotations.map((item, index) => ({
-        id: index,
-        action: item.action,
-        instruction: item.instruction,
-        quote: item.quote,
-        start: item.from,
-        end: item.to,
-      })),
-    }, { signal: controller.signal })
-    const byId = new Map(result.replacements.map(item => [Number(item.id), item.replacement]))
-    const changes = annotations.map((annotation, index) => ({
-      from: annotation.from,
-      to: annotation.to,
-      before: annotation.quote,
-      after: byId.get(index) ?? annotation.quote,
-      annotationId: annotation.id,
-    }))
-    const afterDoc = changes.slice().sort((a, b) => b.from - a.from).reduce(
-      (text, change) => text.slice(0, change.from) + change.after + text.slice(change.to),
-      doc.content,
-    )
-    state.ai.loading = false
-    state.ai.controller = null
-    state.ai.open = true
-    state.ai.instruction = ''
-    if (state.ai.action === 'custom') state.ai.action = 'polish'
-    emit({
-      review: {
-        kind: 'batch',
-        docId: doc.id,
-        from: 0,
-        to: doc.content.length,
-        before: doc.content,
-        after: afterDoc,
-        baseContent: doc.content,
-        changes,
-        stats: lineDiff(doc.content, afterDoc).stats,
-        action: 'batch',
-        scope: 'document',
-      },
-      reviewOpen: true,
-    })
-  } catch (error) {
-    state.ai.loading = false
-    state.ai.controller = null
-    if (error.name === 'AbortError') {
-      emit({})
-      return
-    }
-    state.ai.error = error.message || t('aiError')
-    toast(error.message || t('aiError'), 'error', 6000)
-    emit({})
-  }
 }
 
 export function setInboxRev(rev) {

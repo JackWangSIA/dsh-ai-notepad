@@ -371,6 +371,13 @@ export const CSS = `
 .np-changebar{display:flex;align-items:center;gap:6px;padding:7px 8px;margin-bottom:10px;border:1px solid color-mix(in srgb,var(--np-success) 25%,var(--np-border));border-radius:9px;background:color-mix(in srgb,var(--np-success-soft) 72%,var(--np-panel))}
 .np-changebar-label{display:flex;align-items:center;gap:5px;flex:1;min-width:0;color:var(--np-success);font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .np-changebar .np-btn{padding:4px 7px;min-height:26px;font-size:11px}
+.np-history-body{flex:1;min-height:0;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.np-history-item{border:1px solid var(--np-border);border-radius:9px;background:color-mix(in srgb,var(--np-panel) 84%,transparent);padding:9px}
+.np-history-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.np-history-action{font-size:12px;font-weight:650;color:var(--np-text)}
+.np-history-time{font-size:10.5px;color:var(--np-text-3);font-family:var(--np-mono)}
+.np-history-meta{display:flex;gap:9px;align-items:center;color:var(--np-text-3);font-size:11px;margin-top:4px}
+.np-history-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:7px}
 .np-review-head .np-diff-scope{margin-left:auto}
 .np-review-head .np-btn{margin-left:auto}
 .np-review-body{flex:1;min-height:0;overflow:auto;padding:11px 12px 8px;display:flex;flex-direction:column;gap:8px}

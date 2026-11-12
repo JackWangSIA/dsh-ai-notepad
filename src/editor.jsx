@@ -1,5 +1,5 @@
 import React from 'react'
-import { EditorState, Compartment, StateField, StateEffect } from '@codemirror/state'
+import { EditorState, Compartment } from '@codemirror/state'
 import {
   EditorView,
   keymap,
@@ -12,7 +12,6 @@ import {
   rectangularSelection,
   crosshairCursor,
   placeholder,
-  Decoration,
 } from '@codemirror/view'
 import {
   defaultKeymap,
@@ -39,38 +38,11 @@ import {
   registerEditorBridge,
   clearEditorBridge,
   runAI,
-  addAnnotation,
 } from './store.js'
 
 const wrapCompartment = new Compartment()
 const lineNumberCompartment = new Compartment()
 const tabSizeCompartment = new Compartment()
-
-const setAnnotations = StateEffect.define()
-
-function buildAnnotationDecorations(ranges) {
-  if (!Array.isArray(ranges) || ranges.length === 0) return Decoration.none
-  const items = ranges
-    .filter(item => Number.isInteger(item.from) && Number.isInteger(item.to) && item.to > item.from)
-    .sort((a, b) => a.from - b.from || a.to - b.to)
-  const decorations = []
-  for (const item of items) {
-    decorations.push(Decoration.mark({ class: 'cm-ann', attributes: { title: item.instruction || 'AI annotation' } }).range(item.from, item.to))
-  }
-  return Decoration.set(decorations, true)
-}
-
-const annotationField = StateField.define({
-  create() { return Decoration.none },
-  update(decorations, transaction) {
-    let next = decorations.map(transaction.changes)
-    for (const effect of transaction.effects) {
-      if (effect.is(setAnnotations)) next = buildAnnotationDecorations(effect.value)
-    }
-    return next
-  },
-  provide(field) { return EditorView.decorations.from(field) },
-})
 
 function languageFor(doc) {
   const name = String(doc?.name || doc?.path || '').toLowerCase()
@@ -90,7 +62,6 @@ function createState(doc, settings) {
     highlightActiveLine(),
     highlightActiveLineGutter(),
     highlightSelectionMatches(),
-    annotationField,
     placeholder(t('emptyHint')),
     keymap.of([
       { key: 'Mod-s', preventDefault: true, run: () => { saveDoc(); return true } },
@@ -101,7 +72,6 @@ function createState(doc, settings) {
       { key: 'Mod-Alt-2', preventDefault: true, run: () => { runAI('polish', { instruction: '' }); return true } },
       { key: 'Mod-Alt-3', preventDefault: true, run: () => { runAI('expand', { instruction: '' }); return true } },
       { key: 'Mod-Alt-4', preventDefault: true, run: () => { runAI('proofread', { instruction: '' }); return true } },
-      { key: 'Mod-Alt-b', preventDefault: true, run: () => { addAnnotation(); return true } },
       { key: 'Mod-y', preventDefault: true, run: redo },
       {
         key: 'Mod-e',
@@ -218,22 +188,6 @@ export function NotepadEditor({ doc }) {
         })
         view.focus()
       },
-      dispatchChanges(changes) {
-        if (!Array.isArray(changes) || changes.length === 0) return
-        const sorted = changes.slice().sort((a, b) => a.from - b.from)
-        view.dispatch({ changes: sorted, scrollIntoView: true })
-        view.focus()
-      },
-      scrollTo(from, to) {
-        view.dispatch({
-          selection: { anchor: from, head: to },
-          effects: EditorView.scrollIntoView(from, { y: 'center' }),
-        })
-        view.focus()
-      },
-      clearAnnotations() {
-        view.dispatch({ effects: setAnnotations.of([]) })
-      },
       openSearch() {
         openSearchPanel(view)
         view.focus()
@@ -262,12 +216,6 @@ export function NotepadEditor({ doc }) {
     if (getState().editorBridge) getState().editorBridge.docId = doc.id
     view.focus()
   }, [doc.id, doc.cmState])
-
-  React.useEffect(() => {
-    const view = viewRef.current
-    if (!view) return
-    view.dispatch({ effects: setAnnotations.of(doc.annotations || []) })
-  }, [doc.id, doc.annotations])
 
   React.useEffect(() => {
     const view = viewRef.current
