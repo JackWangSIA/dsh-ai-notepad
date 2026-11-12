@@ -6,13 +6,10 @@
  * CommonMark implementation, and that is intentional: the editor owns the text,
  * the preview is a convenience.
  */
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
+
 function escapeHtml(value) {
-  return String(value == null ? '' : value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+  return String(value == null ? '' : value).replace(/[&<>"']/g, char => HTML_ESCAPES[char])
 }
 
 function safeUrl(value) {

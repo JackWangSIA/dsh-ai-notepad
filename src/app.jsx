@@ -486,6 +486,32 @@ async function imageBlobToPng(blob) {
   }
 }
 
+let markdownPreviewCache = { content: null, html: '' }
+
+function markdownHtml(content) {
+  if (markdownPreviewCache.content === content) return markdownPreviewCache.html
+  const html = renderMarkdown(content)
+  markdownPreviewCache = { content, html }
+  return html
+}
+
+function MarkdownPreview({ doc, onDoubleClick }) {
+  const deferred = React.useDeferredValue(doc.content)
+  const html = React.useMemo(() => markdownHtml(deferred), [deferred])
+  return h('div', {
+    className: 'np-preview',
+    onDoubleClick,
+    onMouseUp: event => {
+      const selection = window.getSelection()
+      if (!selection || selection.isCollapsed) return
+      if (!event.currentTarget.contains(selection.anchorNode)) return
+      setPreviewSelection(selection.toString())
+    },
+    title: t('previewHint'),
+    dangerouslySetInnerHTML: { __html: html },
+  })
+}
+
 function HtmlPreview({ doc, onDoubleClick }) {
   const frameRef = React.useRef(null)
   const [srcDoc, setSrcDoc] = React.useState('')
@@ -694,18 +720,7 @@ export function EditorPane() {
             ),
             kind === 'html'
               ? h(HtmlPreview, { doc, onDoubleClick: leavePreview })
-              : h('div', {
-                className: 'np-preview',
-                onDoubleClick: leavePreview,
-                onMouseUp: event => {
-                  const selection = window.getSelection()
-                  if (!selection || selection.isCollapsed) return
-                  if (!event.currentTarget.contains(selection.anchorNode)) return
-                  setPreviewSelection(selection.toString())
-                },
-                title: t('previewHint'),
-                dangerouslySetInnerHTML: { __html: renderMarkdown(doc.content) },
-              }),
+              : h(MarkdownPreview, { doc, onDoubleClick: leavePreview }),
             h('div', { className: 'np-preview-hint' }, t('previewHint')),
           )
           : h(NotepadEditor, { doc }),

@@ -448,6 +448,7 @@ export const CSS = `
 .np-font-preview small{font-size:.55em;color:var(--np-text-3);letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .np-preview-shell{position:absolute;inset:0;overflow:hidden;background:var(--np-bg)}
 .np-preview{padding-top:60px!important;background:radial-gradient(100% 80% at 50% 0,color-mix(in srgb,var(--np-accent) 4%,var(--np-bg)) 0%,var(--np-bg) 50%)}
+.np-preview > *{content-visibility:auto;contain-intrinsic-size:auto 1.8em}
 .np-previewbar{position:absolute;z-index:7;top:12px;right:16px;left:16px;display:flex;align-items:center;justify-content:space-between;pointer-events:none}
 .np-previewbar>*{pointer-events:auto}
 .np-preview-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;background:color-mix(in srgb,var(--np-panel) 88%,transparent);border:1px solid var(--np-border);color:var(--np-text-2);font-size:11px;box-shadow:0 2px 8px rgba(20,30,50,.06);backdrop-filter:blur(6px)}
