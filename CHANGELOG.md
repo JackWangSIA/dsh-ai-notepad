@@ -15,6 +15,7 @@ All notable changes to AI Notepad are documented here.
 - Preview assets are cached briefly and rewritten once per file, reducing repeated HTML render work.
 - Selection AI now applies immediately; the AI rail shows **Review change** and **Revert change** for the last result. `Enter` runs the instruction, `Shift+Enter` inserts a newline, and the prompt clears after every run.
 - Preset/selection output is normalized so a Markdown heading selection does not gain a duplicate `#` marker.
+- Markdown preview HTML is cached by content and rendered through a deferred value; repeated rail/selection updates no longer re-parse the whole document.
 
 ## 1.1.8 — 2026-10-31
 

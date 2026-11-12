@@ -62,7 +62,7 @@ AI 只输出选中区域的替换文本；运行后直接应用。右侧保留**
 
 ### Markdown / HTML
 
-- Markdown 与 HTML 打开时默认进入渲染模式，`Ctrl+E` 可切回编辑。
+- Markdown 与 HTML 打开时默认进入渲染模式，`Ctrl+E` 可切回编辑；Markdown 预览 HTML 按内容缓存，选区/AI 面板更新不会重复解析全文。
 - Markdown 预览，原始 HTML 会被转义。
 - HTML 也是一等文本类型：CodeMirror HTML 语法高亮、沙箱 HTML 预览。
 - HTML 预览会重写相对 `href` / `src` / `srcset`、内联 CSS 和链接 CSS 的 `url()`，使相对 CSS、图片和字体按 HTML 文件所在目录解析，而不是落到 Harness 应用地址；脚本仍被阻止。
