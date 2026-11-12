@@ -212,7 +212,8 @@ test('host routes expose read/write, AI and inbox operations', async () => {
     assert.ok(preview.json.html.includes(encodeURIComponent(css)))
 
     const diskPreview = await call('/preview-html', { basePath: indexFile, useDisk: true })
-    assert.ok(diskPreview.json.html.includes(encodeURIComponent(css)))
+    assert.equal(diskPreview.json.ok, true)
+    assert.match(diskPreview.json.html, /\/api\/ai-notepad\/asset\?path=/)
     const cachedPreview = await call('/preview-html', { basePath: indexFile, useDisk: true })
     assert.equal(cachedPreview.json.cached, true)
 
