@@ -481,13 +481,47 @@ function AIPanel({ doc }) {
   )
 }
 
+async function imageBlobToPng(blob) {
+  const url = URL.createObjectURL(blob)
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const node = new Image()
+      node.onload = () => resolve(node)
+      node.onerror = () => reject(new Error('image decode failed'))
+      node.src = url
+    })
+    const canvas = document.createElement('canvas')
+    canvas.width = image.naturalWidth || image.width
+    canvas.height = image.naturalHeight || image.height
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('canvas unavailable')
+    context.drawImage(image, 0, 0)
+    return await new Promise((resolve, reject) => {
+      canvas.toBlob(value => value ? resolve(value) : reject(new Error('PNG conversion failed')), 'image/png')
+    })
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
 function HtmlPreview({ doc, onDoubleClick }) {
   const frameRef = React.useRef(null)
   const [srcDoc, setSrcDoc] = React.useState('')
+  const [frameSrc, setFrameSrc] = React.useState('')
   const [error, setError] = React.useState(null)
   const [loading, setLoading] = React.useState(true)
+  const [imageMenu, setImageMenu] = React.useState(null)
   React.useEffect(() => {
     const controller = new AbortController()
+    const useDisk = !doc.dirty && !!doc.path
+    if (useDisk) {
+      setError(null)
+      setLoading(false)
+      setSrcDoc('')
+      setFrameSrc('/api/ai-notepad/asset?path=' + encodeURIComponent(doc.path) + '&v=' + encodeURIComponent(doc.hash || ''))
+      return () => controller.abort()
+    }
+    setFrameSrc('')
     setLoading(true)
     const timer = setTimeout(async () => {
       try {
@@ -499,17 +533,60 @@ function HtmlPreview({ doc, onDoubleClick }) {
       } finally {
         setLoading(false)
       }
-    }, 160)
+    }, 120)
     return () => {
       clearTimeout(timer)
       controller.abort()
     }
-  }, [doc.content, doc.path])
+  }, [doc.content, doc.path, doc.dirty, doc.hash])
+  React.useEffect(() => {
+    if (!imageMenu) return
+    const close = event => {
+      if (event.target?.closest?.('.np-image-menu')) return
+      setImageMenu(null)
+    }
+    const key = event => { if (event.key === 'Escape') setImageMenu(null) }
+    document.addEventListener('mousedown', close, true)
+    window.addEventListener('keydown', key)
+    return () => {
+      document.removeEventListener('mousedown', close, true)
+      window.removeEventListener('keydown', key)
+    }
+  }, [imageMenu])
   const capture = () => {
     try {
       const selection = frameRef.current?.contentWindow?.getSelection()
       if (selection && !selection.isCollapsed) setPreviewSelection(selection.toString())
     } catch {}
+  }
+  const copyImage = async src => {
+    setImageMenu(null)
+    try {
+      const response = await fetch(src, { credentials: 'same-origin' })
+      if (!response.ok) throw new Error('HTTP ' + response.status)
+      let blob = await response.blob()
+      if (blob.type !== 'image/png') blob = await imageBlobToPng(blob)
+      if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+        throw new Error('clipboard image API unavailable')
+      }
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+      toast(t('imageCopied'), 'success', 1800)
+    } catch (failure) {
+      toast(t('imageCopyFailed') + ': ' + (failure.message || ''), 'error', 4200)
+    }
+  }
+  const openImageMenu = event => {
+    const image = event.target?.closest?.('img')
+    if (!image) return
+    event.preventDefault()
+    const rect = frameRef.current?.getBoundingClientRect()
+    const width = 190
+    const height = 42
+    setImageMenu({
+      x: Math.max(8, Math.min((rect?.left || 0) + event.clientX, window.innerWidth - width - 8)),
+      y: Math.max(8, Math.min((rect?.top || 0) + event.clientY, window.innerHeight - height - 8)),
+      src: image.currentSrc || image.src,
+    })
   }
   const onLoad = () => {
     try {
@@ -518,6 +595,8 @@ function HtmlPreview({ doc, onDoubleClick }) {
       target.addEventListener('mouseup', capture)
       target.addEventListener('keyup', capture)
       target.addEventListener('dblclick', onDoubleClick)
+      target.addEventListener('contextmenu', openImageMenu)
+      target.addEventListener('scroll', () => setImageMenu(null), true)
     } catch {}
   }
   return h('div', { className: 'np-html-preview' },
@@ -528,9 +607,19 @@ function HtmlPreview({ doc, onDoubleClick }) {
       className: 'np-html-frame',
       title: 'HTML preview',
       sandbox: 'allow-same-origin',
-      srcDoc,
+      src: frameSrc || undefined,
+      srcDoc: frameSrc ? undefined : srcDoc,
       onLoad,
     }),
+    imageMenu ? h('div', {
+      className: 'np-image-menu',
+      style: { left: imageMenu.x + 'px', top: imageMenu.y + 'px' },
+      onMouseDown: event => event.stopPropagation(),
+    }, h('button', {
+      type: 'button',
+      className: 'np-image-menu-item',
+      onClick: () => copyImage(imageMenu.src),
+    }, h(CopyIcon, { size: 14 }), t('copyImage'))) : null,
   )
 }
 
@@ -734,7 +823,7 @@ function NotepadAppInner() {
           const fresh = newFile()
           const { getState, setState } = await import('./store.js')
           setState({
-            docs: getState().docs.map(item => item.id === fresh.id ? { ...item, content: text, savedContent: '', dirty: true, name: file.name || item.name, cmState: null } : item),
+            docs: getState().docs.map(item => item.id === fresh.id ? { ...item, content: text, savedContent: '', dirty: true, name: file.name || item.name, preview: !!previewKind({ name: file.name }), cmState: null } : item),
             activeId: fresh.id,
           })
         } catch {

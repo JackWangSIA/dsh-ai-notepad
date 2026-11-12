@@ -9,7 +9,10 @@ All notable changes to AI Notepad are documented here.
 - Reworked HTML preview resource loading: relative CSS, images, fonts and CSS `url()` references are rewritten through an authenticated local asset route instead of resolving against the Harness app URL.
 - Replaced the blocking Diff modal with a docked review panel that leaves the editor visible and preserves its scroll position; review opens beside the document.
 - Isolated custom instructions from preset actions in both the client and Host prompts, and added output-boundary cleanup for selection rewrites.
-- Preview selections in Markdown and HTML can now be mapped back to source offsets and sent to selection AI.
+- Preview selections in Markdown and HTML can now be mapped back to source offsets and sent to selection AI, including selections crossing inline formatting and HTML entities.
+- Markdown and HTML files now open directly in preview mode; HTML previews load disk-backed files through the asset route instead of copying the full document through JSON.
+- HTML preview images expose a right-click **Copy original image** action; the image is converted to PNG when needed and written to the clipboard.
+- Preview assets are cached briefly and rewritten once per file, reducing repeated HTML render work.
 
 ## 1.1.8 — 2026-10-31
 

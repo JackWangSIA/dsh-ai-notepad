@@ -72,6 +72,9 @@ const MESSAGES = {
     binary: '这是一个二进制文件，已拒绝打开以保护文件。',
     saved: '已保存',
     largeFile: '已打开超过 16 MiB 的大文件；渲染、预览和 AI 可能变慢，保存时会占用更多内存。',
+    copyImage: '复制原图',
+    imageCopied: '图片已复制到剪贴板',
+    imageCopyFailed: '复制图片失败',
     noPath: '新文件还没有路径',
     dirty: '未保存',
     chars: '字符',
@@ -132,7 +135,7 @@ const MESSAGES = {
     limitAssoc: 'Windows 默认应用仍受 UserChoice 哈希保护，注册 Open With 后需要手动选择一次“始终使用”。',
     limitEditor: '预览是快速查看模式；双击预览会回到编辑，不提供完整的 WYSIWYG 富文本编辑。',
     limitSize: '单文件读取上限 64 MiB（超过 16 MiB 会提示大文件）；全文 AI 上下文约 120k 字符，超长文档会截断中间上下文。',
-    aboutUpdateCurrent: '当前版本：Linux/macOS 原生文件选择、HTML 预览与资源重写、非模态 Diff 侧栏、自定义要求隔离、预览选区 AI。',
+    aboutUpdateCurrent: '当前版本：Markdown/HTML 打开即预览、HTML 图片右键复制、相对资源重写与预览缓存、非模态 Diff 侧栏、预览选区 AI。',
     aboutUpdatePrev: '此前版本：搜索式字体选择器、Ctrl+滚轮缩放、Markdown 预览、Windows 文件关联与启动器。',
     fontSearch: '搜索字体…',
     fontRecommended: '推荐',
@@ -249,6 +252,9 @@ const MESSAGES = {
     binary: 'This looks like a binary file. It was not opened.',
     saved: 'Saved',
     largeFile: 'Opened a file larger than 16 MiB. Rendering, preview and AI may be slower, and saving uses more memory.',
+    copyImage: 'Copy original image',
+    imageCopied: 'Image copied to clipboard',
+    imageCopyFailed: 'Could not copy image',
     noPath: 'This new file has no path yet',
     dirty: 'Unsaved',
     chars: 'chars',
@@ -309,7 +315,7 @@ const MESSAGES = {
     limitAssoc: 'Windows still protects the default-app choice with UserChoice. After registering Open With, choose “Always use” once.',
     limitEditor: 'Preview is a quick reading mode; double-clicking returns to editing, not a full WYSIWYG editor.',
     limitSize: 'File read limit 64 MiB (files over 16 MiB show a large-file warning); document AI context about 120k characters; very long documents omit the middle context.',
-    aboutUpdateCurrent: 'Current: Linux/macOS native pickers, HTML preview with asset rewriting, docked diff review, custom-instruction isolation and preview selection AI.',
+    aboutUpdateCurrent: 'Current: Markdown/HTML open in preview, image copy from HTML, rewritten preview assets with caching, docked diff review and preview selection AI.',
     aboutUpdatePrev: 'Earlier: searchable font picker, Ctrl+wheel zoom, Markdown preview, Windows associations and launcher.',
     fontSearch: 'Search fonts…',
     fontRecommended: 'Recommended',
@@ -613,18 +619,273 @@ export function setSelection(id, selection) {
   if (updated) emit({ docs: updated.docs })
 }
 
-function findTextRange(content, text) {
+const HTML_BLOCK_TAGS = new Set([
+  'address', 'article', 'aside', 'blockquote', 'br', 'dd', 'div', 'dl', 'dt',
+  'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'header', 'hr', 'li', 'main', 'nav', 'ol', 'p', 'pre', 'section', 'table',
+  'tbody', 'td', 'tfoot', 'th', 'thead', 'tr', 'ul',
+])
+
+function decodeEntityAt(source, index) {
+  const match = source.slice(index, index + 16).match(/^&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]+);/i)
+  if (!match) return null
+  const body = match[1]
+  let char = ''
+  if (body[0] === '#') {
+    const code = body[1] && body[1].toLowerCase() === 'x'
+      ? Number.parseInt(body.slice(2), 16)
+      : Number.parseInt(body.slice(1), 10)
+    if (Number.isFinite(code)) {
+      try { char = String.fromCodePoint(code) } catch {}
+    }
+  } else {
+    char = ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' })[body.toLowerCase()] || ''
+  }
+  return char ? { char, length: match[0].length } : null
+}
+
+function buildIndexedPreviewText(source, kind) {
+  const chars = []
+  const starts = []
+  const ends = []
+  const append = (value, from, to) => {
+    if (!value) return
+    if (/\s/.test(value)) {
+      if (chars.length === 0) return
+      if (chars[chars.length - 1] === ' ') {
+        ends[ends.length - 1] = to
+        return
+      }
+      chars.push(' ')
+      starts.push(from)
+      ends.push(to)
+      return
+    }
+    chars.push(value)
+    starts.push(from)
+    ends.push(to)
+  }
+  const appendTwice = (value, from, to) => {
+    for (const char of value) append(char, from, to)
+  }
+  let i = 0
+  if (kind === 'html') {
+    const lower = source.toLowerCase()
+    while (i < source.length) {
+      if (source.startsWith('<!--', i)) {
+        const end = source.indexOf('-->', i + 4)
+        i = end < 0 ? source.length : end + 3
+        continue
+      }
+      if (source[i] === '<') {
+        const end = source.indexOf('>', i + 1)
+        if (end < 0) break
+        let tag = source.slice(i + 1, end).trim()
+        tag = tag.replace(/^\/?/, '').split(/\s/)[0].toLowerCase()
+        if (tag === 'script' || tag === 'style') {
+          const close = lower.indexOf(`</${tag}>`, end + 1)
+          i = close < 0 ? source.length : close
+          continue
+        }
+        if (HTML_BLOCK_TAGS.has(tag)) append(' ', i, i + 1)
+        i = end + 1
+        continue
+      }
+      if (source[i] === '&') {
+        const entity = decodeEntityAt(source, i)
+        if (entity) {
+          appendTwice(entity.char, i, i + entity.length)
+          i += entity.length
+          continue
+        }
+      }
+      append(source[i], i, i + 1)
+      i += 1
+    }
+  } else {
+    let lineStart = true
+    while (i < source.length) {
+      const char = source[i]
+      if (char === '\n' || char === '\r') {
+        append(' ', i, i + 1)
+        i += 1
+        lineStart = true
+        continue
+      }
+      if (lineStart) {
+        if (source.startsWith('```', i)) {
+          const eol = source.indexOf('\n', i)
+          i = eol < 0 ? source.length : eol + 1
+          lineStart = true
+          continue
+        }
+        if ('#>+-*'.includes(char)) {
+          let j = i
+          while (source[j] === char) j += 1
+          if (source[j] === ' ') {
+            i = j + 1
+            lineStart = false
+            continue
+          }
+        }
+        lineStart = false
+      }
+      if ('*_`~'.includes(char)) {
+        i += 1
+        continue
+      }
+      if (char === '!' && source[i + 1] === '[') {
+        i += 1
+        continue
+      }
+      if (char === '[' || char === ']') {
+        if (char === ']' && source[i + 1] === '(') {
+          let depth = 1
+          let j = i + 2
+          while (j < source.length && depth > 0) {
+            if (source[j] === '(') depth += 1
+            else if (source[j] === ')') depth -= 1
+            j += 1
+          }
+          i = j
+          continue
+        }
+        i += 1
+        continue
+      }
+      append(char, i, i + 1)
+      i += 1
+    }
+  }
+  return { text: chars.join(''), starts, ends }
+}
+
+function findIndexedRange(source, needle, kind, offset = 0) {
+  const indexed = buildIndexedPreviewText(source, kind)
+  const at = indexed.text.indexOf(needle)
+  if (at === -1) return null
+  const from = indexed.starts[at]
+  const to = indexed.ends[at + needle.length - 1]
+  if (!Number.isInteger(from) || !Number.isInteger(to)) return null
+  return { from: from + offset, to: to + offset }
+}
+
+function findLargePreviewRange(source, needle, kind) {
+  const tokens = needle.match(/[\p{L}\p{N}_]+/gu) || []
+  if (tokens.length === 0) return null
+  const first = tokens[0]
+  const last = tokens[tokens.length - 1]
+  const maxSpan = 600_000
+  let from = 0
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const start = source.indexOf(first, from)
+    if (start < 0) break
+    const lastAt = source.indexOf(last, start + first.length)
+    if (lastAt >= 0 && lastAt - start <= maxSpan) {
+      const sliceStart = Math.max(0, start - 200)
+      const sliceEnd = Math.min(source.length, lastAt + last.length + 200)
+      const slice = source.slice(sliceStart, sliceEnd)
+      const mapped = findIndexedRange(slice, needle, kind)
+      if (mapped) return { from: mapped.from + sliceStart, to: mapped.to + sliceStart }
+    }
+    from = start + Math.max(1, first.length)
+  }
+  return null
+}
+
+export function findPreviewRange(content, text, kind) {
+  const source = String(content || '')
+  const raw = String(text || '').trim()
+  if (!raw) return null
+  const exact = source.indexOf(raw)
+  if (exact !== -1) return { from: exact, to: exact + raw.length }
+  const needle = raw.replace(/\s+/g, ' ').trim()
+  if (!needle) return null
+  const mapped = source.length > 1_000_000
+    ? findLargePreviewRange(source, needle, kind === 'html' ? 'html' : 'markdown')
+    : findIndexedRange(source, needle, kind === 'html' ? 'html' : 'markdown')
+  if (!mapped) return null
+  if (kind === 'html') return expandHtmlRange(source, mapped.from, mapped.to)
+  return expandMarkdownRange(source, mapped.from, mapped.to)
+}
+
+function expandMarkdownRange(source, from, to) {
+  let start = from
+  let end = to
+  const isMarker = char => char === '*' || char === '_' || char === '~'
+  for (;;) {
+    let moved = false
+    while (start > 0 && isMarker(source[start - 1])) {
+      start -= 1
+      moved = true
+    }
+    if (start > 0 && source[start - 1] === '[') {
+      start -= 1
+      if (start > 0 && source[start - 1] === '!') start -= 1
+      moved = true
+    }
+    if (!moved) break
+  }
+  for (;;) {
+    let moved = false
+    while (end < source.length && isMarker(source[end])) {
+      end += 1
+      moved = true
+    }
+    if (source[end] === ']' && source[end + 1] === '(') {
+      let depth = 1
+      let index = end + 2
+      while (index < source.length && depth > 0) {
+        if (source[index] === '(') depth += 1
+        else if (source[index] === ')') depth -= 1
+        index += 1
+      }
+      end = index
+      moved = true
+    }
+    if (!moved) break
+  }
+  return { from: start, to: end }
+}
+
+const HTML_VOID_TAGS = new Set([
+  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta',
+  'param', 'source', 'track', 'wbr',
+])
+
+function expandHtmlRange(source, from, to) {
+  const opened = []
+  const slice = source.slice(from, to)
+  const tagPattern = /<\s*(\/?)\s*([a-z][a-z0-9:-]*)\b([^>]*)>/gi
+  let match
+  while ((match = tagPattern.exec(slice))) {
+    const closing = match[1] === '/'
+    const tag = match[2].toLowerCase()
+    if (HTML_VOID_TAGS.has(tag) || /\/\s*$/.test(match[3])) continue
+    if (closing) {
+      const index = opened.lastIndexOf(tag)
+      if (index !== -1) opened.splice(index, 1)
+    } else {
+      opened.push(tag)
+    }
+  }
+  let end = to
+  for (let index = opened.length - 1; index >= 0; index -= 1) {
+    const tag = opened[index]
+    const close = new RegExp(`<\\s*/\\s*${tag}\\s*>`, 'i').exec(source.slice(end))
+    if (!close) continue
+    end += close.index + close[0].length
+  }
+  return { from, to: end }
+}
+
+function findTextRange(content, text, kind) {
   const source = String(content || '')
   const needle = String(text || '').trim()
   if (!needle) return null
   const exact = source.indexOf(needle)
   if (exact !== -1) return { from: exact, to: exact + needle.length }
-  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')
-  try {
-    const match = new RegExp(escaped, 'm').exec(source)
-    if (match) return { from: match.index, to: match.index + match[0].length }
-  } catch {}
-  return null
+  return findPreviewRange(source, needle, kind)
 }
 
 export function setPreviewSelection(text) {
@@ -635,7 +896,7 @@ export function setPreviewSelection(text) {
     setSelection(doc.id, { from: 0, to: 0, text: '', coords: null, source: 'preview' })
     return
   }
-  const range = findTextRange(doc.content, value)
+  const range = findTextRange(doc.content, value, previewKind(doc))
   setSelection(doc.id, {
     from: range ? range.from : -1,
     to: range ? range.to : -1,
@@ -715,6 +976,7 @@ export async function openPath(filePath, options = {}) {
       hash: result.hash,
       size: result.size,
       large: result.large === true,
+      preview: !!previewKind({ name: result.name, path: result.path }),
       mtimeMs: result.mtimeMs,
       readOnly: result.readOnly,
       dirty: false,

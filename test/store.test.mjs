@@ -72,6 +72,57 @@ test('preview selections map back to source offsets', () => {
   assert.equal(store.activeDoc().selection.unmapped, true)
 })
 
+test('opening HTML and Markdown starts in preview mode', async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async (url, init) => {
+    const body = JSON.parse(init.body)
+    assert.equal(body.path, 'C:\\demo\\sample.html')
+    return new Response(JSON.stringify({
+      ok: true,
+      path: body.path,
+      name: 'sample.html',
+      content: '<h1>Hello</h1>',
+      encoding: 'utf-8',
+      bom: false,
+      eol: '\n',
+      hash: 'hash',
+      size: 14,
+      large: false,
+      mtimeMs: 1,
+      readOnly: false,
+    }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }
+  try {
+    const doc = await store.openPath('C:\\demo\\sample.html')
+    assert.ok(doc)
+    assert.equal(doc.preview, true)
+    assert.equal(store.previewKind({ name: 'sample.md' }), 'markdown')
+    assert.equal(store.previewKind({ name: 'sample.html' }), 'html')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('preview selection mapping crosses inline HTML and Markdown formatting', () => {
+  const html = '<p>Hello <b>world</b></p>'
+  const htmlRange = store.findPreviewRange(html, 'Hello world', 'html')
+  assert.ok(htmlRange)
+  assert.equal(html.slice(htmlRange.from, htmlRange.to), 'Hello <b>world</b>')
+  const entity = store.findPreviewRange('<p>Tom &amp; Jerry</p>', 'Tom & Jerry', 'html')
+  assert.ok(entity)
+  assert.equal('<p>Tom &amp; Jerry</p>'.slice(entity.from, entity.to), 'Tom &amp; Jerry')
+
+  const markdown = '# Heading\n\nHello **world** and [link](https://example.com)'
+  const mdRange = store.findPreviewRange(markdown, 'Hello world and link', 'markdown')
+  assert.ok(mdRange)
+  assert.equal(markdown.slice(mdRange.from, mdRange.to), 'Hello **world** and [link](https://example.com)')
+
+  const largeHtml = '<p>' + 'x '.repeat(600_000) + 'Hello <b>world</b></p>'
+  const largeRange = store.findPreviewRange(largeHtml, 'Hello world', 'html')
+  assert.ok(largeRange)
+  assert.equal(largeHtml.slice(largeRange.from, largeRange.to), 'Hello <b>world</b>')
+})
+
 test('typing a custom instruction cannot combine with a preset action', async () => {
   const originalFetch = globalThis.fetch
   let requestBody = null

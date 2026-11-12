@@ -208,17 +208,25 @@ test('host routes expose read/write, AI, batch and inbox operations', async () =
     const image = path.join(assets, 'bg.png')
     await fs.writeFile(css, 'body{background:url("./bg.png")}')
     await fs.writeFile(image, Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+    const indexFile = path.join(site, 'index.html')
+    await fs.writeFile(indexFile, '<link rel="stylesheet" href="./assets/theme.css"><img src="./assets/bg.png">')
     const preview = await call('/preview-html', {
       html: '<link rel="stylesheet" href="./assets/theme.css"><img src="./assets/bg.png">',
-      basePath: path.join(site, 'index.html'),
+      basePath: indexFile,
     })
     assert.match(preview.json.html, /\/api\/ai-notepad\/asset\?path=/)
     assert.ok(preview.json.html.includes(encodeURIComponent(css)))
+
+    const diskPreview = await call('/preview-html', { basePath: indexFile, useDisk: true })
+    assert.ok(diskPreview.json.html.includes(encodeURIComponent(css)))
+    const cachedPreview = await call('/preview-html', { basePath: indexFile, useDisk: true })
+    assert.equal(cachedPreview.json.cached, true)
 
     const assetRoute = routes.get('/api/ai-notepad/asset')
     assert.ok(assetRoute)
     const assetResponse = await assetRoute.fetch(new Request('http://127.0.0.1/api/ai-notepad/asset?path=' + encodeURIComponent(css)))
     assert.match(assetResponse.headers.get('content-type') || '', /text\/css/)
+    assert.ok(assetResponse.headers.get('etag'))
     assert.ok((await assetResponse.text()).includes(encodeURIComponent(image)))
   } finally {
     await cleanup()

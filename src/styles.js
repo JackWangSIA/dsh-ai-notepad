@@ -383,6 +383,9 @@ export const CSS = `
 .np-html-frame{position:absolute;inset:48px 0 0;width:100%;height:calc(100% - 48px);border:0;background:var(--np-bg)}
 .np-preview-loading,.np-preview-error{position:absolute;z-index:8;left:50%;top:84px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:9px;background:var(--np-panel);border:1px solid var(--np-border);box-shadow:0 8px 24px rgba(16,26,44,.12);font-size:12px;color:var(--np-text-2);max-width:80%}
 .np-preview-error{color:var(--np-warn);border-color:color-mix(in srgb,var(--np-warn) 40%,var(--np-border))}
+.np-image-menu{position:fixed;z-index:130;min-width:168px;padding:4px;border:1px solid var(--np-border-strong);border-radius:9px;background:var(--np-panel);box-shadow:0 12px 32px rgba(15,24,40,.24);animation:np-in .1s ease-out}
+.np-image-menu-item{appearance:none;width:100%;display:flex;align-items:center;gap:8px;border:0;border-radius:6px;background:transparent;color:var(--np-text);font:inherit;font-size:12.5px;padding:7px 9px;text-align:left;cursor:pointer}
+.np-image-menu-item:hover{background:var(--np-accent-soft);color:var(--np-accent)}
 .np-empty{background:radial-gradient(720px 420px at 50% 36%,color-mix(in srgb,var(--np-accent) 12%,var(--np-bg)) 0%,var(--np-bg) 66%)}
 .np-mark{width:78px;height:78px;border-radius:22px;background:var(--np-accent-gradient);color:#fff;box-shadow:0 18px 36px color-mix(in srgb,var(--np-accent) 28%,transparent);margin-bottom:20px}
 .np-emptybox h2{font-size:23px;letter-spacing:-.02em;margin-bottom:8px}
