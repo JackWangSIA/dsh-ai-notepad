@@ -46,7 +46,8 @@ On DSH Desktop, prefer **Plugins → Add plugin** with the repository URL. The `
 - Encoding-aware I/O: UTF-8, UTF-8 BOM, UTF-16 LE/BE, GB18030/GBK and Windows-1252. Saves preserve the detected encoding, BOM and dominant line ending. GB18030/Windows-1252 round-trip checks refuse lossy writes.
 - Binary-file detection protects files from accidental text editing.
 - Hash-based compare-before-write: if another program changed the file while it was open, the save returns a conflict and does not write.
-- Selection-scoped AI editing: concise, polish, expand, restructure, proofread, or a custom instruction. `Enter` runs the instruction, `Shift+Enter` inserts a newline, and the prompt clears after each run.
+- Selection-scoped AI editing: concise, polish, expand, restructure and proofread run immediately from the quick-action buttons; each button has a hover description. Typing in the textarea switches to a custom instruction; `Enter` runs it, `Shift+Enter` inserts a newline, and the prompt clears after each run.
+- The chrome follows DeepSeek Harness theme tokens (surfaces, labels, borders and brand accent); the default `system` theme tracks DSH light/dark.
 - AI changes apply immediately. The rail keeps a **Review change** / **Revert change** action for the last result; review shows the diff without blocking the editor, and revert restores the previous text. `Ctrl+Z` remains available.
 - Whole-document AI: polish, concise, summarize, outline and title generation.
 - Every AI change is kept in a per-document history. Open **Change history** in the rail to view any diff or revert to the content before that change. Reverting an older change also discards the later changes for that document.

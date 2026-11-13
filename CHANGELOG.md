@@ -2,6 +2,13 @@
 
 All notable changes to AI Notepad are documented here.
 
+## 1.2.1 — 2026-11-13
+
+- Aligned the plugin chrome with DeepSeek Harness theme tokens instead of a separate purple palette; the default `system` theme follows DSH light/dark automatically.
+- Added a single top-right preview/edit mode button that works in both directions; removed double-click-to-edit and its hint.
+- Replaced the AI preset/custom action picker with immediate-run quick actions, removed the Custom button, and added hover descriptions for selection and full-document actions.
+- Kept custom instructions in the textarea with Enter to run, Shift+Enter for a newline, and automatic prompt clearing after each run.
+
 ## 1.2.0 — 2026-11-12
 
 - Added Linux/macOS native open/save dialogs (zenity, kdialog, yad, osascript) and cross-platform font discovery, reveal-in-file-manager and graceful association fallbacks.
