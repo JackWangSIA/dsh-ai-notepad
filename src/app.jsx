@@ -456,7 +456,7 @@ function AIPanel({ doc }) {
             style: { flex: 1 },
             disabled: !mappable || !hasInstruction || state.ai.loading,
             onClick: runCustom,
-          }, state.ai.loading ? h('span', { className: 'np-spin' }) : h(SparkIcon, { size: 14 }), t('runCustom')),
+          }, state.ai.loading ? h('span', { className: 'np-spin' }) : h(SparkIcon, { size: 14 }), t('run')),
         ),
         state.ai.error ? h('div', { className: 'np-error' }, state.ai.error) : null,
       ),

@@ -2,6 +2,10 @@
 
 All notable changes to AI Notepad are documented here.
 
+## 1.2.2 — 2026-11-13
+
+- Renamed the custom-instruction submit action to a neutral “Run” button; custom mode is represented only by the textarea.
+
 ## 1.2.1 — 2026-11-13
 
 - Aligned the plugin chrome with DeepSeek Harness theme tokens instead of a separate purple palette; the default `system` theme follows DSH light/dark automatically.
