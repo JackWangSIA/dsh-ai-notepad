@@ -31,7 +31,6 @@ import {
   setSettingsOpen,
   setMenu,
   setContextMenu,
-  setAIAction,
   setAIInstruction,
   setPreview,
   setPreviewSelection,
@@ -240,6 +239,16 @@ function Topbar() {
         disabled: !doc,
         title: t('save') + ' (Ctrl+S)',
       }, h(SaveIcon, { size: 15 }), h('span', null, t('save'))),
+      previewKind(doc) ? h('button', {
+        type: 'button',
+        className: 'np-btn np-preview-toggle' + (doc.preview ? ' np-active' : ''),
+        onClick: () => setPreview(doc.id, !doc.preview),
+        title: t('togglePreview') + ' (Ctrl+E)',
+      },
+        doc.preview ? h(EditIcon, { size: 14 }) : h(EyeIcon, { size: 14 }),
+        h('span', { className: 'np-label' }, doc.preview ? t('edit') : t('preview')),
+        h('span', { className: 'np-kbd' }, 'Ctrl+E'),
+      ) : null,
       h('button', {
         type: 'button',
         className: 'np-btn np-ai-toggle' + (state.ai.open ? ' np-active' : ''),
@@ -345,17 +354,26 @@ function FloatingBar({ doc }) {
     h('button', { type: 'button', className: 'np-btn np-sm', onClick: run('polish') }, t('polish')),
     h('button', { type: 'button', className: 'np-btn np-sm', onClick: run('expand') }, t('expand')),
     h('button', { type: 'button', className: 'np-btn np-sm', onClick: run('proofread') }, t('proofread')),
-    h('button', { type: 'button', className: 'np-btn np-sm np-primary', onClick: event => { event.preventDefault(); openAI(); setAIAction('custom') } }, h(SparkIcon, { size: 13 }), 'AI'),
+    h('button', { type: 'button', className: 'np-btn np-sm np-primary', onClick: event => { event.preventDefault(); openAI() } }, h(SparkIcon, { size: 13 }), 'AI'),
   )
 }
 
 const QUICK_ACTIONS = [
-  ['concise', 'concise'],
-  ['polish', 'polish'],
-  ['expand', 'expand'],
-  ['restructure', 'restructure'],
-  ['proofread', 'proofread'],
-  ['custom', 'custom'],
+  ['concise', 'concise', 'descConcise'],
+  ['polish', 'polish', 'descPolish'],
+  ['expand', 'expand', 'descExpand'],
+  ['restructure', 'restructure', 'descRestructure'],
+  ['proofread', 'proofread', 'descProofread'],
+]
+
+const FULL_ACTIONS = [
+  ['polish', 'polish', 'descFullPolish'],
+  ['concise', 'concise', 'descFullConcise'],
+  ['proofread', 'proofread', 'descFullProofread'],
+  ['restructure', 'restructure', 'descFullRestructure'],
+  ['summarize', 'summarize', 'descSummarize'],
+  ['outline', 'outline', 'descOutline'],
+  ['titles', 'titles', 'descTitles'],
 ]
 
 function AIPanel({ doc }) {
@@ -371,17 +389,10 @@ function AIPanel({ doc }) {
   const selection = doc.selection
   const hasSelection = !!(selection && selection.text)
   const mappable = hasSelection && selection.from >= 0
-  const run = (action, scope) => runAI(action, {
-    scope,
-    instruction: action === 'custom' ? state.ai.instruction : '',
-  })
-  const fullActions = [
-    ['polish', t('polish')],
-    ['concise', t('concise')],
-    ['summarize', t('summarize')],
-    ['outline', t('outline')],
-    ['titles', t('titles')],
-  ]
+  const instruction = state.ai.instruction
+  const hasInstruction = instruction.trim() !== ''
+  const runPreset = (action, scope) => runAI(action, { scope, instruction: '' })
+  const runCustom = () => runAI('custom', { scope: 'selection', instruction })
   return h('aside', { className: 'np-ai', 'aria-label': t('aiEdit') },
     h('div', { className: 'np-ai-head' },
       h('div', { className: 'np-ai-title' }, h(SparkIcon, { size: 16 }), t('aiEdit')),
@@ -410,49 +421,59 @@ function AIPanel({ doc }) {
         selection?.unmapped ? h('p', { className: 'np-hint np-warn' }, t('previewSelectionUnmapped')) : null,
       ),
       h('div', { className: 'np-ai-section' },
-        h('p', { className: 'np-ai-label' }, t('custom')),
-        h('div', { className: 'np-actions' }, QUICK_ACTIONS.map(([key, label]) => h('button', {
+        h('div', { className: 'np-row' },
+          h('p', { className: 'np-ai-label', style: { flex: 1, margin: 0 } }, t('quickActions')),
+          h('span', { className: 'np-hint', style: { margin: 0 } }, t('clickToRun')),
+        ),
+        h('div', { className: 'np-actions' }, QUICK_ACTIONS.map(([key, label, desc]) => h('button', {
           type: 'button',
           key,
-          className: 'np-action' + (state.ai.action === key ? ' active' : ''),
-          onClick: () => setAIAction(key),
+          className: 'np-action',
+          disabled: !mappable || state.ai.loading,
+          title: mappable ? t(desc) : t('selectFirst'),
+          'data-tip': mappable ? t(desc) : t('selectFirst'),
+          onClick: () => runPreset(key, 'selection'),
         }, t(label)))),
-        h('div', { style: { height: 7 } }),
+      ),
+      h('div', { className: 'np-ai-section' },
+        h('p', { className: 'np-ai-label' }, t('customInstruction')),
         h('textarea', {
           className: 'np-textarea',
-          value: state.ai.instruction,
+          value: instruction,
           placeholder: t('customPlaceholder'),
           onChange: event => setAIInstruction(event.target.value),
           onKeyDown: event => {
             if (event.key !== 'Enter' || event.shiftKey || event.altKey) return
-            if (event.nativeEvent?.isComposing) return
+            if (event.nativeEvent?.isComposing || !hasInstruction) return
             event.preventDefault()
-            if (!state.ai.loading) runAI(state.ai.action, { scope: 'selection' })
+            if (mappable && !state.ai.loading) runCustom()
           },
         }),
-        state.ai.instruction.trim() ? h('p', { className: 'np-hint' }, t('customModeHint')) : null,
         h('div', { className: 'np-row', style: { marginTop: 7 } },
           h('button', {
             type: 'button',
             className: 'np-btn np-primary',
             style: { flex: 1 },
-            disabled: !mappable || state.ai.loading,
-            onClick: () => run(state.ai.action, 'selection'),
-          }, state.ai.loading ? h('span', { className: 'np-spin' }) : h(SparkIcon, { size: 14 }), t('run')),
+            disabled: !mappable || !hasInstruction || state.ai.loading,
+            onClick: runCustom,
+          }, state.ai.loading ? h('span', { className: 'np-spin' }) : h(SparkIcon, { size: 14 }), t('runCustom')),
         ),
         state.ai.error ? h('div', { className: 'np-error' }, state.ai.error) : null,
       ),
       h('div', { className: 'np-ai-section' },
         h('div', { className: 'np-row' },
           h('p', { className: 'np-ai-label', style: { flex: 1, margin: 0 } }, t('fullDocument')),
+          h('span', { className: 'np-hint', style: { margin: 0 } }, t('clickToRun')),
         ),
-        h('div', { className: 'np-actions', style: { marginTop: 6 } }, fullActions.map(([key, label]) => h('button', {
+        h('div', { className: 'np-actions' }, FULL_ACTIONS.map(([key, label, desc]) => h('button', {
           type: 'button',
           key: 'full-' + key,
           className: 'np-action',
           disabled: state.ai.loading,
-          onClick: () => run(key, 'document'),
-        }, label))),
+          title: t(desc),
+          'data-tip': t(desc),
+          onClick: () => runPreset(key, 'document'),
+        }, t(label)))),
       ),
     ),
     state.ai.loading ? h('div', { className: 'np-ai-footer' },
@@ -495,24 +516,22 @@ function markdownHtml(content) {
   return html
 }
 
-function MarkdownPreview({ doc, onDoubleClick }) {
+function MarkdownPreview({ doc }) {
   const deferred = React.useDeferredValue(doc.content)
   const html = React.useMemo(() => markdownHtml(deferred), [deferred])
   return h('div', {
     className: 'np-preview',
-    onDoubleClick,
     onMouseUp: event => {
       const selection = window.getSelection()
       if (!selection || selection.isCollapsed) return
       if (!event.currentTarget.contains(selection.anchorNode)) return
       setPreviewSelection(selection.toString())
     },
-    title: t('previewHint'),
     dangerouslySetInnerHTML: { __html: html },
   })
 }
 
-function HtmlPreview({ doc, onDoubleClick }) {
+function HtmlPreview({ doc }) {
   const frameRef = React.useRef(null)
   const [srcDoc, setSrcDoc] = React.useState('')
   const [frameSrc, setFrameSrc] = React.useState('')
@@ -602,7 +621,6 @@ function HtmlPreview({ doc, onDoubleClick }) {
       if (!target) return
       target.addEventListener('mouseup', capture)
       target.addEventListener('keyup', capture)
-      target.addEventListener('dblclick', onDoubleClick)
       target.addEventListener('contextmenu', openImageMenu)
       target.addEventListener('scroll', () => setImageMenu(null), true)
     } catch {}
@@ -694,13 +712,6 @@ export function EditorPane() {
 
   const kind = previewKind(doc)
   const preview = !!kind && doc.preview
-  const leavePreview = () => {
-    setPreview(doc.id, false)
-    setTimeout(() => {
-      const bridge = getState().editorBridge
-      if (bridge && bridge.view) bridge.view.focus()
-    }, 40)
-  }
   return h('div', { className: 'np-main' },
     h('div', { className: 'np-editor-col' },
       doc.conflict ? h('div', { className: 'np-conflict' },
@@ -716,12 +727,10 @@ export function EditorPane() {
           ? h('div', { className: 'np-preview-shell' + (kind === 'html' ? ' np-preview-shell-html' : '') },
             h('div', { className: 'np-previewbar' },
               h('span', { className: 'np-preview-pill' }, h(EyeIcon, { size: 13 }), kind === 'html' ? t('htmlPreviewMode') : t('previewMode')),
-              h('button', { type: 'button', className: 'np-btn np-sm np-preview-edit', onClick: leavePreview, title: t('togglePreview') + ' (Ctrl+E)' }, h(EditIcon, { size: 13 }), t('edit'), h('span', { className: 'np-kbd' }, 'Ctrl+E')),
             ),
             kind === 'html'
-              ? h(HtmlPreview, { doc, onDoubleClick: leavePreview })
-              : h(MarkdownPreview, { doc, onDoubleClick: leavePreview }),
-            h('div', { className: 'np-preview-hint' }, t('previewHint')),
+              ? h(HtmlPreview, { doc })
+              : h(MarkdownPreview, { doc }),
           )
           : h(NotepadEditor, { doc }),
         h(FloatingBar, { doc }),
