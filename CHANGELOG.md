@@ -2,6 +2,13 @@
 
 All notable changes to AI Notepad are documented here.
 
+## 1.2.3 — 2026-11-14
+
+- Selection actions are now paired: concise/expand, bullets/paragraphs, plain/advanced, grammar/common-sense proofreading. Each pair runs immediately from the rail, with hover descriptions.
+- The selection floating card now includes the paired actions plus an inline custom-instruction input.
+- History can now revert one non-overlapping change while keeping later changes. Overlapping or whole-document follow-up changes are marked as not independently revertible instead of silently discarding later work.
+- Full-document quick actions are unchanged.
+
 ## 1.2.2 — 2026-11-13
 
 - Renamed the custom-instruction submit action to a neutral “Run” button; custom mode is represented only by the textarea.

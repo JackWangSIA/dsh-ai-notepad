@@ -188,12 +188,12 @@ test('a heading replacement does not gain a second hash marker', async () => {
   }
 })
 
-test('every AI modification is kept in history and can be rolled back', async () => {
+test('history can revert one change without discarding later non-overlapping changes', async () => {
   const originalFetch = globalThis.fetch
   let step = 0
   globalThis.fetch = async () => {
     step += 1
-    return new Response(JSON.stringify({ ok: true, text: step === 1 ? 'One' : 'Two', provider: 'test', model: 'test' }), {
+    return new Response(JSON.stringify({ ok: true, text: step === 1 ? 'ALPHA' : 'GAMMA', provider: 'test', model: 'test' }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
     })
@@ -201,16 +201,22 @@ test('every AI modification is kept in history and can be rolled back', async ()
   try {
     store.getState().history = []
     store.newFile()
-    const doc = store.activeDoc()
-    store.updateDocContent(doc.id, 'First', null, null, { line: 1, column: 1 })
-    await store.runAI('polish', { scope: 'document' })
-    await store.runAI('polish', { scope: 'document' })
-    assert.equal(store.activeDoc().content, 'Two')
+    let doc = store.activeDoc()
+    store.updateDocContent(doc.id, 'alpha beta gamma', null, { from: 0, to: 5, text: 'alpha', coords: null }, { line: 1, column: 1 })
+    await store.runAI('polish', { scope: 'selection' })
+    doc = store.activeDoc()
+    assert.equal(doc.content, 'ALPHA beta gamma')
+    store.updateDocContent(doc.id, doc.content, null, { from: 11, to: 16, text: 'gamma', coords: null }, { line: 1, column: 1 })
+    await store.runAI('polish', { scope: 'selection' })
+    doc = store.activeDoc()
+    assert.equal(doc.content, 'ALPHA beta GAMMA')
     assert.equal(store.getState().history.length, 2)
     const first = store.getState().history[0]
     store.revertHistory(first.id)
-    assert.equal(store.activeDoc().content, 'First')
-    assert.equal(store.getState().history.length, 0)
+    assert.equal(store.activeDoc().content, 'alpha beta GAMMA')
+    assert.equal(store.getState().history.length, 2)
+    assert.equal(store.getState().history[0].reverted, true)
+    assert.equal(store.getState().history[1].reverted, undefined)
   } finally {
     globalThis.fetch = originalFetch
   }

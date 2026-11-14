@@ -1,6 +1,6 @@
 {
   "name": "dsh-ai-notepad",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "AI Notepad for DeepSeek Harness: a lightweight, general-purpose text editor with selection-scoped AI editing, docked diff review, Markdown and HTML preview, encoding-safe saves, and native file pickers.",
   "private": false,
   "type": "module",

@@ -337,44 +337,94 @@ function EmptyState() {
   )
 }
 
-function FloatingBar({ doc }) {
-  const selection = doc.selection
-  if (!selection || !selection.text || !selection.coords || !doc) return null
-  const run = action => event => {
-    event.preventDefault()
-    event.stopPropagation()
-    runAI(action, { instruction: '' })
-  }
-  return h('div', {
-    className: 'np-floatbar',
-    style: { left: selection.coords.left + 'px', top: selection.coords.top + 'px' },
-    onMouseDown: event => event.preventDefault(),
-  },
-    h('button', { type: 'button', className: 'np-btn np-sm', onClick: run('concise') }, t('concise')),
-    h('button', { type: 'button', className: 'np-btn np-sm', onClick: run('polish') }, t('polish')),
-    h('button', { type: 'button', className: 'np-btn np-sm', onClick: run('expand') }, t('expand')),
-    h('button', { type: 'button', className: 'np-btn np-sm', onClick: run('proofread') }, t('proofread')),
-    h('button', { type: 'button', className: 'np-btn np-sm np-primary', onClick: event => { event.preventDefault(); openAI() } }, h(SparkIcon, { size: 13 }), 'AI'),
-  )
-}
-
-const QUICK_ACTIONS = [
-  ['concise', 'concise', 'descConcise'],
-  ['polish', 'polish', 'descPolish'],
-  ['expand', 'expand', 'descExpand'],
-  ['restructure', 'restructure', 'descRestructure'],
-  ['proofread', 'proofread', 'descProofread'],
+const QUICK_PAIRS = [
+  [
+    ['concise', 'concise', 'descConcise'],
+    ['expand', 'expand', 'descExpand'],
+  ],
+  [
+    ['bullets', 'bullets', 'descBullets'],
+    ['paragraph', 'paragraph', 'descParagraph'],
+  ],
+  [
+    ['plain', 'plain', 'descPlain'],
+    ['advanced', 'advanced', 'descAdvanced'],
+  ],
+  [
+    ['proofread', 'proofread', 'descProofread'],
+    ['common', 'common', 'descCommon'],
+  ],
 ]
 
 const FULL_ACTIONS = [
   ['polish', 'polish', 'descFullPolish'],
   ['concise', 'concise', 'descFullConcise'],
-  ['proofread', 'proofread', 'descFullProofread'],
-  ['restructure', 'restructure', 'descFullRestructure'],
   ['summarize', 'summarize', 'descSummarize'],
   ['outline', 'outline', 'descOutline'],
   ['titles', 'titles', 'descTitles'],
 ]
+
+function FloatingBar({ doc }) {
+  const state = useNotepad()
+  const selection = doc.selection
+  if (!selection || !selection.text || !selection.coords || !doc) return null
+  const instruction = state.ai.instruction
+  const hasInstruction = instruction.trim() !== ''
+  const runPreset = action => event => {
+    event.preventDefault()
+    event.stopPropagation()
+    runAI(action, { scope: 'selection', instruction: '' })
+  }
+  const runCustom = event => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (hasInstruction) runAI('custom', { scope: 'selection', instruction })
+  }
+  const left = Math.max(8, Math.min(selection.coords.left, window.innerWidth - 366))
+  const top = Math.max(8, Math.min(selection.coords.top, window.innerHeight - 330))
+  return h('div', {
+    className: 'np-floatbar np-floatcard',
+    style: { left: left + 'px', top: top + 'px' },
+    onMouseDown: event => {
+      if (event.target.closest('button')) event.preventDefault()
+    },
+  },
+    h('div', { className: 'np-float-pairs' }, QUICK_PAIRS.map((pair, pairIndex) => h('div', {
+      className: 'np-float-pair',
+      key: 'pair-' + pairIndex,
+    }, pair.map(([key, label, desc]) => h('button', {
+      type: 'button',
+      key,
+      className: 'np-btn np-sm',
+      title: t(desc),
+      onClick: runPreset(key),
+    }, t(label))))),
+    ),
+    h('div', { className: 'np-float-custom' },
+      h('input', {
+        className: 'np-float-input',
+        value: instruction,
+        placeholder: t('floatPlaceholder'),
+        onChange: event => setAIInstruction(event.target.value),
+        onKeyDown: event => {
+          if (event.key !== 'Enter' || event.shiftKey || event.altKey) return
+          if (event.nativeEvent?.isComposing || !hasInstruction) return
+          runCustom(event)
+        },
+      }),
+      h('button', {
+        type: 'button',
+        className: 'np-btn np-sm np-primary',
+        disabled: !hasInstruction || state.ai.loading,
+        onClick: runCustom,
+      }, state.ai.loading ? h('span', { className: 'np-spin' }) : h(SparkIcon, { size: 12 }), t('run')),
+    ),
+    h('div', { className: 'np-float-foot' },
+      h('span', { className: 'np-float-hint' }, t('floatHint')),
+      h('button', { type: 'button', className: 'np-btn np-sm np-outline', onClick: event => { event.preventDefault(); openAI() } }, t('openPanel')),
+    ),
+  )
+}
 
 function AIPanel({ doc }) {
   const state = useNotepad()
@@ -425,7 +475,10 @@ function AIPanel({ doc }) {
           h('p', { className: 'np-ai-label', style: { flex: 1, margin: 0 } }, t('quickActions')),
           h('span', { className: 'np-hint', style: { margin: 0 } }, t('clickToRun')),
         ),
-        h('div', { className: 'np-actions' }, QUICK_ACTIONS.map(([key, label, desc]) => h('button', {
+        h('div', { className: 'np-action-pairs' }, QUICK_PAIRS.map((pair, pairIndex) => h('div', {
+          className: 'np-action-pair',
+          key: 'quick-pair-' + pairIndex,
+        }, pair.map(([key, label, desc]) => h('button', {
           type: 'button',
           key,
           className: 'np-action',
@@ -433,7 +486,7 @@ function AIPanel({ doc }) {
           title: mappable ? t(desc) : t('selectFirst'),
           'data-tip': mappable ? t(desc) : t('selectFirst'),
           onClick: () => runPreset(key, 'selection'),
-        }, t(label)))),
+        }, t(label)))))),
       ),
       h('div', { className: 'np-ai-section' },
         h('p', { className: 'np-ai-label' }, t('customInstruction')),
@@ -949,7 +1002,13 @@ function ReviewPanel({ review }) {
         autoApplied
           ? h(React.Fragment, null,
             h('button', { type: 'button', className: 'np-btn np-outline', onClick: closeReview }, t('close')),
-            h('button', { type: 'button', className: 'np-btn np-danger', style: { flex: 1 }, onClick: () => revertLastChange() }, t('revertChange')),
+            h('button', {
+              type: 'button',
+              className: 'np-btn np-danger',
+              style: { flex: 1 },
+              disabled: review.reverted || review.conflicted,
+              onClick: () => revertLastChange(),
+            }, t('revertChange')),
           )
           : h(React.Fragment, null,
             h('button', { type: 'button', className: 'np-btn np-outline', onClick: clearReview }, t('reject')),
@@ -990,10 +1049,17 @@ function HistoryPanel({ doc }) {
           h('div', { className: 'np-history-meta' },
             h('span', { className: 'np-diff-add' }, '+' + (item.stats?.additions || 0)),
             h('span', { className: 'np-diff-del' }, '-' + (item.stats?.deletions || 0)),
+            item.reverted ? h('span', { className: 'np-badge' }, t('revertedBadge')) : null,
+            item.conflicted ? h('span', { className: 'np-badge dirty' }, t('conflictBadge')) : null,
           ),
           h('div', { className: 'np-history-actions' },
             h('button', { type: 'button', className: 'np-btn np-sm np-outline', onClick: () => openHistoryReview(item.id) }, t('viewChange')),
-            h('button', { type: 'button', className: 'np-btn np-sm np-danger', onClick: () => revertHistory(item.id) }, t('rollback')),
+            h('button', {
+              type: 'button',
+              className: 'np-btn np-sm np-danger',
+              disabled: item.reverted || item.conflicted,
+              onClick: () => revertHistory(item.id),
+            }, t('rollback')),
           ),
         )),
     ),

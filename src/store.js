@@ -43,8 +43,13 @@ const MESSAGES = {
     polish: '润色',
     expand: '扩写',
     restructure: '重构',
-    proofread: '纠错',
+    proofread: '语法',
     custom: '自定义',
+    bullets: '条目化',
+    paragraph: '段落化',
+    plain: '易懂',
+    advanced: '高级',
+    common: '常识',
     summarize: '内容总结',
     outline: '逻辑梳理',
     titles: '生成标题',
@@ -60,11 +65,19 @@ const MESSAGES = {
     clickToRun: '点击即运行',
     customInstruction: '自定义要求',
     selectFirst: '请先选中文字',
+    floatPlaceholder: '输入修改要求，Enter 运行',
+    floatHint: '快捷改法，或输入自己的要求',
+    openPanel: 'AI 面板',
     descConcise: '压缩选区内文字，保留关键信息、事实和数字。',
     descPolish: '改善用词、语气和流畅度，不改变原意。',
     descExpand: '补充解释、细节或例子，不改变核心意思。',
     descRestructure: '调整语序和逻辑层次，使表达更清晰。',
-    descProofread: '修正错别字、语法、标点和明显的表达问题。',
+    descProofread: '只修正语法、错别字、标点和明显的表达问题。',
+    descBullets: '把内容整理成清晰的条目或 Markdown 列表。',
+    descParagraph: '把条目或碎片整理成自然、连贯的段落。',
+    descPlain: '换成更简单、直白的词汇和句式。',
+    descAdvanced: '在准确的前提下使用更精确、成熟的表达。',
+    descCommon: '优先检查事实、逻辑和常识矛盾，而不是只改语法。',
     descFullPolish: '在不改变事实和结构的前提下改善全文表达。',
     descFullConcise: '压缩全文，删除重复和空话。',
     descFullProofread: '检查并修正全文的错别字、语法和标点。',
@@ -93,9 +106,11 @@ const MESSAGES = {
     revertBlocked: '文档内容已变化，无法精确退回；请使用 Ctrl+Z',
     history: '修改历史',
     historyEmpty: '还没有 AI 修改记录。',
-    historyHint: '每次 AI 修改都会保留在这里；回退会恢复到该次修改前。',
-    historyConfirm: '回退到此次修改前会丢弃它之后的修改，继续吗？',
-    historyRolledBack: '已回退到此次修改前',
+    historyHint: '每次 AI 修改都会保留在这里；可以单独回退某次修改，后续修改会保留。',
+    alreadyReverted: '该修改已经回退',
+    independentRevertBlocked: '这次修改与之后的内容已经重叠，无法安全单独回退；请使用 Ctrl+Z 或先处理后面的修改。',
+    revertedBadge: '已回退',
+    conflictBadge: '不可单独回退',
     viewChange: '查看',
     rollback: '回退',
     noPath: '新文件还没有路径',
@@ -155,7 +170,7 @@ const MESSAGES = {
     limitAssoc: 'Windows 默认应用仍受 UserChoice 哈希保护，注册 Open With 后需要手动选择一次“始终使用”。',
     limitEditor: '预览是快速查看模式，可通过右上角按钮或 Ctrl+E 回到编辑，不提供完整的 WYSIWYG 富文本编辑。',
     limitSize: '单文件读取上限 64 MiB（超过 16 MiB 会提示大文件）；全文 AI 上下文约 120k 字符，超长文档会截断中间上下文。',
-    aboutUpdateCurrent: '当前版本：界面沿用 DSH 主题 token；右上角双向预览/编辑按钮；AI 快捷操作点击即运行并带悬停说明；自定义输入独立运行。',
+    aboutUpdateCurrent: '当前版本：DSH 主题 token；右上角双向预览/编辑；选区四对快捷操作与浮动输入框；非重叠修改可单独回退。',
     aboutUpdatePrev: '此前版本：搜索式字体选择器、Ctrl+滚轮缩放、Markdown 预览、Windows 文件关联与启动器。',
     fontSearch: '搜索字体…',
     fontRecommended: '推荐',
@@ -240,8 +255,13 @@ const MESSAGES = {
     polish: 'Polish',
     expand: 'Expand',
     restructure: 'Restructure',
-    proofread: 'Proofread',
+    proofread: 'Grammar',
     custom: 'Custom',
+    bullets: 'Bullets',
+    paragraph: 'Paragraphs',
+    plain: 'Plain language',
+    advanced: 'Advanced',
+    common: 'Common sense',
     summarize: 'Summarize',
     outline: 'Outline',
     titles: 'Titles',
@@ -257,11 +277,19 @@ const MESSAGES = {
     clickToRun: 'Click to run',
     customInstruction: 'Custom instruction',
     selectFirst: 'Select text first',
+    floatPlaceholder: 'Type an instruction; Enter runs',
+    floatHint: 'Quick edits, or write your own',
+    openPanel: 'AI panel',
     descConcise: 'Compress the selected text while keeping key facts and numbers.',
     descPolish: 'Improve wording, tone and flow without changing the meaning.',
     descExpand: 'Add explanation or detail without changing the core meaning.',
     descRestructure: 'Reorder sentences and logic for clearer structure.',
-    descProofread: 'Fix typos, grammar, punctuation and obvious wording issues.',
+    descProofread: 'Fix grammar, typos, punctuation and obvious wording issues only.',
+    descBullets: 'Turn the content into clear bullets or a Markdown list.',
+    descParagraph: 'Turn bullets or fragments into natural, connected paragraphs.',
+    descPlain: 'Use simpler, more direct wording and sentence structure.',
+    descAdvanced: 'Use more precise, sophisticated wording while staying accurate.',
+    descCommon: 'Check facts, logic and common-sense contradictions, not only grammar.',
     descFullPolish: 'Improve the whole document while keeping facts and structure.',
     descFullConcise: 'Compress the whole document and remove repetition.',
     descFullProofread: 'Check and fix typos, grammar and punctuation throughout.',
@@ -290,9 +318,11 @@ const MESSAGES = {
     revertBlocked: 'The document changed, so it cannot be reverted precisely; use Ctrl+Z',
     history: 'Change history',
     historyEmpty: 'No AI changes yet.',
-    historyHint: 'Every AI change is kept here; reverting restores the content before that change.',
-    historyConfirm: 'Reverting to before this change discards the changes after it. Continue?',
-    historyRolledBack: 'Reverted to before this change',
+    historyHint: 'Every AI change is kept here; you can revert one change without discarding later changes.',
+    alreadyReverted: 'This change is already reverted',
+    independentRevertBlocked: 'This change overlaps later content and cannot be reverted safely on its own. Use Ctrl+Z or handle the later changes first.',
+    revertedBadge: 'Reverted',
+    conflictBadge: 'Cannot revert independently',
     viewChange: 'View',
     rollback: 'Revert',
     noPath: 'This new file has no path yet',
@@ -352,7 +382,7 @@ const MESSAGES = {
     limitAssoc: 'Windows still protects the default-app choice with UserChoice. After registering Open With, choose “Always use” once.',
     limitEditor: 'Preview is a quick reading mode; use the top-right button or Ctrl+E to return to editing. It is not a full WYSIWYG editor.',
     limitSize: 'File read limit 64 MiB (files over 16 MiB show a large-file warning); document AI context about 120k characters; very long documents omit the middle context.',
-    aboutUpdateCurrent: 'Current: DSH theme-token chrome, a bidirectional preview/edit button, immediate AI quick actions with hover descriptions, and independent custom instructions.',
+    aboutUpdateCurrent: 'Current: DSH theme tokens, bidirectional preview/edit, four selection action pairs with a floating instruction box, and independent revert for non-overlapping changes.',
     aboutUpdatePrev: 'Earlier: searchable font picker, Ctrl+wheel zoom, Markdown preview, Windows associations and launcher.',
     fontSearch: 'Search fonts…',
     fontRecommended: 'Recommended',
@@ -1236,6 +1266,14 @@ const MAX_HISTORY_ENTRIES = 40
 const MAX_HISTORY_BYTES = 64 * 1024 * 1024
 
 function pushHistory(change) {
+  for (const item of state.history) {
+    if (item.docId !== change.docId || item.reverted) continue
+    if (change.scope === 'document' || item.scope === 'document') {
+      item.conflicted = true
+    } else if (change.from < item.to && change.to > item.from) {
+      item.conflicted = true
+    }
+  }
   state.history.push(change)
   while (state.history.length > MAX_HISTORY_ENTRIES) state.history.shift()
   let bytes = state.history.reduce((total, item) => total
@@ -1421,33 +1459,80 @@ function applySingleChange(change) {
   return true
 }
 
+function contextScore(content, change, at) {
+  const request = change.request || {}
+  const beforeContext = typeof request.beforeContext === 'string' ? request.beforeContext : ''
+  const afterContext = typeof request.afterContext === 'string' ? request.afterContext : ''
+  const afterLength = String(change.after || '').length
+  let score = 0
+  if (beforeContext) {
+    const tail = beforeContext.slice(-80)
+    if (tail && content.slice(Math.max(0, at - tail.length), at) === tail) score += tail.length
+  }
+  if (afterContext) {
+    const head = afterContext.slice(0, 80)
+    if (head && content.slice(at + afterLength, at + afterLength + head.length) === head) score += head.length
+  }
+  return score - Math.min(1000, Math.abs(at - change.from)) / 1000
+}
+
+function locateChangeRange(content, change) {
+  if (change.reverted || change.conflicted) return null
+  if (change.scope === 'document' || change.kind !== 'single') {
+    return content === change.afterContent ? { from: 0, to: content.length } : null
+  }
+  const after = String(change.after || '')
+  if (after === '') return null
+  let index = 0
+  let best = null
+  let bestScore = -Infinity
+  while (index < content.length) {
+    const at = content.indexOf(after, index)
+    if (at === -1) break
+    const score = contextScore(content, change, at)
+    if (score > bestScore) {
+      bestScore = score
+      best = at
+    }
+    index = at + Math.max(1, after.length)
+  }
+  if (best === null) return null
+  return { from: best, to: best + after.length }
+}
+
 export function revertHistory(id) {
-  const index = state.history.findIndex(item => item.id === id)
-  const change = index >= 0 ? state.history[index] : null
+  const change = state.history.find(item => item.id === id)
   if (!change) return
-  const doc = state.docs.find(item => item.id === change.docId)
-  if (!doc) return
-  const later = state.history.some((item, at) => at > index && item.docId === doc.id)
-  const currentIsAfter = doc.content === change.afterContent
-  if (!currentIsAfter && !window.confirm(t('historyConfirm'))) return
-  const target = typeof change.beforeContent === 'string' ? change.beforeContent : null
-  if (target === null) {
-    toast(t('revertBlocked'), 'warn', 5000)
+  if (change.reverted) {
+    toast(t('alreadyReverted'), 'info', 2000)
     return
   }
+  if (change.conflicted) {
+    toast(t('independentRevertBlocked'), 'warn', 5000)
+    return
+  }
+  const doc = state.docs.find(item => item.id === change.docId)
+  if (!doc) return
+  const range = locateChangeRange(doc.content, change)
+  if (!range) {
+    toast(t('independentRevertBlocked'), 'warn', 5200)
+    return
+  }
+  const content = doc.content.slice(0, range.from) + String(change.before || '') + doc.content.slice(range.to)
   if (state.editorBridge && state.editorBridge.docId === doc.id) {
-    state.editorBridge.dispatchChange({ from: 0, to: doc.content.length, insert: target })
+    state.editorBridge.dispatchChange({ from: range.from, to: range.to, insert: String(change.before || '') })
   } else {
-    const updated = replaceDoc(doc.id, { content: target, cmState: null, dirty: target !== doc.savedContent })
+    const updated = replaceDoc(doc.id, { content, cmState: null, dirty: content !== doc.savedContent })
     if (updated) emit({ docs: updated.docs })
   }
-  state.history = state.history.filter((item, at) => !(item.docId === doc.id && at >= index))
+  change.reverted = true
+  change.revertedAt = Date.now()
   state.review = null
   state.reviewOpen = false
   state.historyOpen = false
   state.ai.open = true
   emit({})
-  toast(later ? t('historyRolledBack') : t('reverted'), 'success', 2200)
+  toast(t('reverted'), 'success', 2000)
 }
 
 export function revertLastChange() {
