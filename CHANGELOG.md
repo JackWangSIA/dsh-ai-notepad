@@ -2,6 +2,12 @@
 
 All notable changes to AI Notepad are documented here.
 
+## 1.3.0 — 2026-11-14
+
+- Refreshed the whole project introduction, README, market entry, and plugin metadata around the current editor experience.
+- Crash-safe autosave, floating preview/edit control, top-toolbar change history, paired selection actions, independent revert, custom accent colour, Markdown-first new files, and clickable association format chips are now presented as one coherent feature set.
+- Removed the duplicate hover-description implementation; action buttons use one tooltip path.
+
 ## 1.2.3 — 2026-11-14
 
 - Added crash-safe autosave to a bounded on-disk recovery store; it debounces edits, keeps no duplicate full-text copy in memory, and offers restore/discard after restart.

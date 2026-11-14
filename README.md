@@ -9,18 +9,96 @@
 </p>
 
 <p align="center">
-  <strong>A lightweight, general-purpose, AI-native text editor for DeepSeek Harness.</strong><br>
-  Plain text editing + selection-scoped AI + Windows file associations.
+  <strong>A lightweight, AI-native text editor for DeepSeek Harness.</strong><br>
+  Edit any text file, improve only what you select, and never lose a draft to a crash.
 </p>
 
-![AI Notepad editor](assets/screenshot-editor.png)
+## Why AI Notepad
 
-AI Notepad is a DeepSeek Harness plugin that turns the Harness Web UI into a lightweight, general-purpose AI text editor.
+AI Notepad is not a full IDE and not a Markdown-only previewer. It is the editor you open when you need to read a log, fix a README, polish a paragraph, or change a JSON value without leaving DeepSeek Harness.
+
+It combines three things that usually live in separate tools:
+
+- **A real text editor** for any file that can be detected as text.
+- **Selection-scoped AI** that changes the part you chose, not the whole document.
+- **Crash-safe autosave and independent history** so experimentation is reversible.
+
+## Highlights
+
+### Write and save safely
+
+- Open, edit, save, and Save As through native pickers on Windows, Linux, and macOS; dropped files also open.
+- Multi-tab editing with CodeMirror 6, undo/redo, find, line numbers, wrapping, and unsaved-change protection.
+- UTF-8, UTF-8 BOM, UTF-16 LE/BE, GB18030/GBK, and Windows-1252 are detected automatically. Saving preserves the encoding, BOM, and dominant line ending.
+- Binary files are rejected before they can be corrupted.
+- A SHA-256 compare-before-write guard refuses to overwrite a file that another program changed while it was open.
+- New documents start as Markdown (`.md`).
+
+### Selection AI made for real editing
+
+Select text and use the floating card or the AI rail. The same four pairs are available in both places, each pair in one button strip with a visible relation marker:
+
+| Pair | What it does |
+|---|---|
+| **More concise / Richer** | Compress the selection, or add useful detail |
+| **Bullets / Paragraphs** | Turn prose into a list, or turn fragments into natural paragraphs |
+| **Simpler / More advanced** | Use plain language, or use more precise and sophisticated wording |
+| **Check grammar / Check common sense** | Fix grammar only, or prioritise factual, logical, and common-sense issues |
+
+Quick-action buttons run immediately. Hover a button for a short description. The floating card also contains an inline instruction field: type a custom request and press `Enter`. The rail textarea supports `Enter` to run and `Shift+Enter` for a newline. Prompts clear after every run.
+
+### Review and history without losing later work
+
+- AI edits apply immediately; the rail keeps **Review change** and **Revert change** for the latest result.
+- Review shows a non-blocking diff. `Ctrl+Z` remains available.
+- Every AI change is recorded per document. The history button sits in the top toolbar with a change count.
+- Revert an older **non-overlapping** change and later changes stay intact.
+- If a change overlaps later content, or a whole-document change is followed by more edits, it is marked **not independently revertible** instead of silently discarding later work.
+
+### Crash-safe autosave
+
+Dirty content is written to a bounded recovery store about one second after typing stops:
+
+```text
+~/.dsh/ai-notepad/autosave/
+```
+
+- No second full-text copy is retained in memory.
+- One debounced timer per dirty document; the recovery list loads metadata only.
+- At most 20 recovery entries or 64 MiB are kept.
+- After a crash or forced exit, the next start offers **Restore / Discard / Discard all / Later**.
+- Restored content opens as a new unsaved document and never overwrites the original file.
+- A normal save removes the recovery copy.
+
+### Markdown and HTML preview
+
+- Markdown and HTML open in preview mode by default.
+- The preview/edit button floats at the **top-right of the editing area**, in both directions; `Ctrl+E` also works.
+- Markdown preview HTML is cached by content, so selection and rail updates do not re-parse the whole document.
+- Markdown raw HTML is escaped; the renderer uses a conservative CommonMark subset.
+- HTML preview rewrites relative `href`, `src`, `srcset`, inline CSS, and linked CSS `url()` references through an authenticated local asset route. Relative CSS, images, and fonts resolve from the HTML file's directory.
+- Scripts remain blocked in HTML previews.
+- Select text in a preview to use selection AI; ranges are mapped back to Markdown/HTML source without the usual “cannot map” warning in normal cases.
+- Right-click an image in an HTML preview and choose **Copy original image** to put it on the clipboard.
+
+### Looks like DeepSeek Harness
+
+- Surfaces, labels, borders, status colors, and brand accent come from DSH theme tokens.
+- The default `system` theme follows DSH light/dark.
+- A separate **accent color** highlights paired buttons, selection cards, file-format chips, and the brand mark. Pick a preset or use the colour picker; the setting is persisted locally.
+- New files default to Markdown; file associations use clickable format chips (`.md`, `.txt`, `.json`, `.html`, `.css`, `.js`, `.py`, `.ps1`, `.log`, `.yaml`, `.csv`, and more) that add or remove extensions and normalise the comma-separated list.
+
+### Native integration
+
+- Windows per-user file associations: ProgID, `OpenWithProgids`, `RegisteredApplications`, and a lightweight VBS launcher that delivers paths to the running Harness through the plugin inbox.
+- Windows 10/11 protects the default-app choice with a per-user `UserChoice` hash. AI Notepad registers a real Open With entry, but the user still chooses **Always use this app** once in Explorer.
+- Linux foreground Open/Save uses `zenity`, `kdialog`, or `yad`; reveal uses the FreeDesktop `FileManager1` D-Bus API with an `xdg-open` fallback.
+- macOS uses `osascript` for Open/Save and `open -R` for reveal.
+- System associations are Windows-only; the association panel explains this and hides install/remove actions elsewhere.
 
 ## Install
 
-From the plugin market after the listing is live. The market entry uses the
-version-free GitHub Release tarball, so no npm account is required.
+From the plugin market after the listing is live. The market entry uses the version-free GitHub Release tarball, so npm is not required.
 
 From GitHub:
 
@@ -28,44 +106,21 @@ From GitHub:
 dsh plugin --profile web add JackWangSIA/dsh-ai-notepad
 ```
 
-A prebuilt tarball is available at:
+Prebuilt tarball:
 
 ```text
 https://github.com/JackWangSIA/dsh-ai-notepad/releases/latest/download/dsh-ai-notepad.tgz
 ```
 
-If the package is later published to npm, `dsh plugin --profile web add dsh-ai-notepad`
-will also work.
-
 On DSH Desktop, prefer **Plugins → Add plugin** with the repository URL. The `desktop` profile is managed by the app; do not edit it with the CLI by hand.
 
-## What works
+## Quick start
 
-- Open, edit, save and Save As any text file through a native picker (Windows, Linux, macOS), or drop a file onto the editor.
-- Multi-tab editing with CodeMirror 6, undo/redo, find, line numbers, wrapping, and unsaved-change prompting.
-- Encoding-aware I/O: UTF-8, UTF-8 BOM, UTF-16 LE/BE, GB18030/GBK and Windows-1252. Saves preserve the detected encoding, BOM and dominant line ending. GB18030/Windows-1252 round-trip checks refuse lossy writes.
-- Binary-file detection protects files from accidental text editing.
-- Hash-based compare-before-write: if another program changed the file while it was open, the save returns a conflict and does not write.
-- Selection-scoped AI editing uses four pairs: more concise/richer, bullets/paragraphs, simpler/more advanced wording, and check grammar/check common sense. Buttons run immediately and include hover descriptions. The floating selection card repeats the pairs and adds an inline instruction box; `Enter` runs it, `Shift+Enter` inserts a newline in the rail textarea, and the prompt clears after each run.
-- The chrome follows DeepSeek Harness theme tokens (surfaces, labels, borders and brand accent); the default `system` theme tracks DSH light/dark. A customizable accent color highlights paired buttons, selection cards and the brand mark.
-- New documents default to Markdown and use a `.md` filename.
-- Autosave writes dirty content to `~/.dsh/ai-notepad/autosave/` about one second after typing stops, without keeping a second full-text copy in memory. After a crash, a recovery dialog offers restore/discard; restored text opens as a new unsaved document and never overwrites the original file. The recovery store is capped at 20 entries / 64 MiB.
-- The preview/edit toggle floats at the top-right of the editor area; change history lives in the top toolbar.
-- AI changes apply immediately. The rail keeps a **Review change** / **Revert change** action for the last result; review shows the diff without blocking the editor, and revert restores the previous text. `Ctrl+Z` remains available.
-- Whole-document AI: polish, concise, summarize, outline and title generation.
-- Every AI change is kept in a per-document history. Open **Change history** in the rail to view any diff, or revert one non-overlapping change while keeping later edits. Changes that overlap later content, or whole-document changes followed by more edits, are marked as not independently revertible instead of silently dropping later work.
-- Markdown and HTML files open directly in preview mode. Markdown preview HTML is cached by content, so selection and rail updates do not re-parse the whole document. Markdown preview escapes raw HTML and uses a conservative CommonMark subset. HTML files are first-class too, with CodeMirror HTML syntax highlighting and a sandboxed HTML preview. The top-right mode button and **Ctrl+E** toggle preview/edit in both directions.
-- HTML previews load saved files through the authenticated asset route (instead of copying the full document through JSON), rewrite CSS/image references once per file, and briefly cache preview assets. Right-click an image and choose **Copy original image** to put it on the clipboard.
-- HTML preview rewrites relative `href` / `src` / `srcset`, inline CSS and linked CSS `url()` references through an authenticated local asset route, so `../../theme.css`, images and fonts resolve from the HTML file's directory instead of the Harness app URL. Scripts remain blocked in the preview.
-- Select text in a Markdown or HTML preview to use selection AI; the selection is mapped back to source offsets and only confirmed ranges are applied.
-- Independent font, size, line-height, weight, wrap, theme, line-number and tab-size settings, persisted in browser storage.
-- Searchable system font picker with recommended Chinese/latin fonts, per-font samples, a live typography preview, keyboard navigation and a refresh action. Windows uses PowerShell font enumeration; Linux uses `fc-list`; the setting stores one family name and always appends safe CJK/latin fallbacks.
-- **Ctrl+wheel** zooms the editor font from 8–48 px; `Ctrl+=` / `Ctrl+-` / `Ctrl+0` also work. The current size is shown in the status bar.
-- V2 visual refresh: compact menu cluster, gradient brand mark, pill save button, softer tab strip, card-based AI rail and settings sections, refined empty state, custom scrollbars and dark-theme variants.
-- **About** sits beside File and View: version, build/update time, feature overview, shortcut reference, live runtime information (platform, current model, association status), recent updates, usage boundaries, and a one-click “copy version info” action. Version and build time are injected by `scripts/build.mjs` from `package.json` and the build clock.
-- Windows per-user file associations: ProgID, `OpenWithProgids`, `RegisteredApplications` and a lightweight VBS launcher that writes paths to an inbox and starts/focuses DSH. The Host watcher consumes the queue and the Client opens the files.
-- Association status, install, remove and restore actions are in View → File associations.
-- Click format chips (`.md`, `.txt`, `.json`, `.html`, etc.) to add or remove extensions; the comma-separated field is normalized automatically.
+1. Open AI Notepad from the sidebar or the plugin panel.
+2. Press `Ctrl+N` for a new Markdown file, or drop a text file into the editor.
+3. Select a sentence or paragraph and choose a paired action, or type your own request in the floating card.
+4. Review the applied change in the rail, or open **Change history** in the top toolbar.
+5. `Ctrl+E` toggles preview/edit for Markdown and HTML.
 
 ## Shortcuts
 
@@ -74,50 +129,47 @@ On DSH Desktop, prefer **Plugins → Add plugin** with the repository URL. The `
 | `Ctrl+S` / `Ctrl+Shift+S` | Save / Save As |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / Redo |
 | `Ctrl+F` | Find |
-| `Ctrl+E` | Toggle Markdown / HTML preview / edit |
+| `Ctrl+E` | Toggle Markdown / HTML preview and edit |
 | `Ctrl+wheel`, `Ctrl+=`, `Ctrl+-`, `Ctrl+0` | Font zoom in / out / reset |
 | `Ctrl+Alt+1..4` | Selection concise / polish / expand / proofread |
-| `Ctrl+Alt+N` | Focus AI Notepad from the main shell |
+| `Enter` | Run a custom instruction |
+| `Shift+Enter` | Newline in the rail instruction box |
 
-![AI Notepad About panel](assets/screenshot-about.png)
+## Platform support
 
-## Important Windows limitation
-
-Windows 10/11 protects the default-app choice with a per-user `UserChoice` hash. No third-party application can silently force itself to become the default. AI Notepad therefore registers a real current-user `OpenWithProgids` entry, after which the user chooses it once in Explorer's **Open with → Always use this app**. The plugin can open Windows Default Apps for that choice, but it does not fake the system default. Uninstalling removes the ProgID and Open With entries; if AI Notepad is the current `UserChoice`, it removes that choice so Windows asks again. It cannot restore a previous hash-protected default.
-
-The desktop shell has a single-instance lock but currently ignores file paths in its argv. The VBS launcher is therefore not a simulation: it is the registered file handler, and it delivers paths to the running Harness through the plugin inbox. A second launch focuses the existing window.
-
-## Linux and macOS
-
-- Open/Save use `zenity`, `kdialog` or `yad` on Linux; install one of them if no native dialog appears.
-- macOS uses `osascript` for Open/Save.
-- Fonts use `fc-list` when fontconfig is available, otherwise a small safe fallback list.
-- Reveal uses the FreeDesktop `FileManager1` D-Bus API, falling back to `xdg-open` on Linux, and `open -R` on macOS.
-- System file associations remain Windows-only. On Linux/macOS the association panel reports this and hides install/remove actions; normal editing is unaffected.
+- **Windows:** native pickers, font enumeration, file associations, reveal.
+- **Linux:** native pickers when `zenity`/`kdialog`/`yad` is installed; `fc-list` fonts; FreeDesktop reveal; editing works without associations.
+- **macOS:** `osascript` pickers; `fc-list` fonts when available; `open -R` reveal; editing works without associations.
 
 ## Architecture
 
-- `lib/index.js` — Host half. Connection `/api/ai-notepad/*` routes, bounded file I/O, encoding, conflict guards, LLM calls, Windows registry, inbox watcher, pickers, font enumeration.
-- `src/` — Client source. `app.jsx` is the full main-column page, `editor.jsx` owns CodeMirror, `store.js` owns tabs/AI/review/settings, `diff.js` and `markdown.js` are pure helpers.
-- `lib/client.js` — generated classic ModuleLoader bundle (React and `react/jsx-runtime` stay external).
-- `lib/scripts/` — native file pickers, font enumeration and the Windows external-open launcher.
+- `lib/index.js` — Host half. Authenticated `/api/ai-notepad/*` routes, bounded file I/O, encoding, conflict guards, autosave store, LLM calls, Windows registry, inbox watcher, pickers, and font enumeration.
+- `src/` — Client source. `app.jsx` renders the page, `editor.jsx` owns CodeMirror, `store.js` owns tabs/AI/review/history/autosave/settings, and `diff.js` / `markdown.js` are pure helpers.
+- `lib/client.js` — generated classic ModuleLoader bundle (React stays external).
+- `lib/scripts/` — native file pickers, font enumeration, and the Windows external-open launcher.
 - `scripts/build.mjs` — esbuild bundle step.
-- `test/` — Host route/integration tests, encoding tests, VBS→inbox test, store AI/history tests, ModuleLoader load test, and server-render tests for app/review/preview.
+- `test/` — Host route and encoding tests, VBS/inbox delivery, store AI/history/autosave tests, ModuleLoader load, and server-render tests.
 
-## Build and install
+## Development
 
 ```powershell
 $node = "$env:USERPROFILE\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\node.exe"
 $pnpm = "$env:USERPROFILE\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\pnpm\bin\pnpm.mjs"
 & $node $pnpm install --ignore-scripts --dir .
 & $node scripts/build.mjs
+& $node --test test/*.test.mjs
 ```
 
-Then install the absolute directory with the Harness `plugin_manager` `install_bundle` action. Do not copy files into the profile manually.
+Install the absolute directory with the Harness `plugin_manager` `install_bundle` action. Do not copy files into the profile manually.
 
-## Verification notes
+## Limits and security
 
-The plugin installs and its Host row is active; the Client registers a main page, a sidebar panel icon and a settings section. Automated tests cover file I/O, encoding, conflict handling, AI request/response shapes with a fake LLM, selection/batch review and apply, generated client load, VBS queue delivery, and server-side rendering of the app, review and preview views. Live behavior was exercised through Windows UI Automation; screenshots in `assets/` come from the running desktop app.
+- Individual file read limit: 64 MiB. Files over 16 MiB show a large-file warning.
+- Whole-document AI context is about 120k characters; very long documents omit the middle context.
+- History is per document and session-only. It is not persisted across restarts; autosave covers draft recovery, not the history ledger.
+- HTML previews block scripts. They are for reading and selection AI, not for running an HTML application.
+- External images in HTML previews may fail to copy because of browser CORS rules.
+- Autosave is a recovery copy, not a substitute for saving. A normal save is still the source of truth.
 
 ## License
 
