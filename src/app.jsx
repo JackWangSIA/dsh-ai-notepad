@@ -339,7 +339,7 @@ function EmptyState() {
 
 const QUICK_PAIRS = [
   [
-    ['concise', 'concise', 'descConcise'],
+    ['concise', 'conciseLocal', 'descConcise'],
     ['expand', 'expand', 'descExpand'],
   ],
   [
@@ -354,6 +354,21 @@ const QUICK_PAIRS = [
     ['proofread', 'proofread', 'descProofread'],
     ['common', 'common', 'descCommon'],
   ],
+]
+
+const ASSOC_PRESETS = [
+  ['md', 'Markdown'],
+  ['markdown', 'Markdown'],
+  ['txt', 'Text'],
+  ['json', 'JSON'],
+  ['html', 'HTML'],
+  ['css', 'CSS'],
+  ['js', 'JavaScript'],
+  ['py', 'Python'],
+  ['ps1', 'PowerShell'],
+  ['log', 'Log'],
+  ['yaml', 'YAML'],
+  ['csv', 'CSV'],
 ]
 
 const FULL_ACTIONS = [
@@ -901,6 +916,7 @@ function NotepadAppInner() {
       '--np-line-height': state.settings.lineHeight,
       '--np-preview-scale': state.settings.previewScale,
       '--np-editor-weight': state.settings.fontWeight,
+      '--np-spark': state.settings.accent || '#e8a33d',
     },
     onDragOver,
     onDrop,
@@ -1261,6 +1277,29 @@ function SettingsForm({ compact = false }) {
         ),
       ),
       h('div', { className: 'np-field' },
+        h('label', { htmlFor: 'np-accent' }, t('accent')),
+        h('div', { className: 'np-accent-row' },
+          h('input', {
+            id: 'np-accent',
+            className: 'np-accent-picker',
+            type: 'color',
+            value: settings.accent || '#e8a33d',
+            onChange: event => set({ accent: event.target.value }),
+          }),
+          h('span', { className: 'np-accent-value' }, (settings.accent || '#e8a33d').toUpperCase()),
+          h('div', { className: 'np-accent-swatches' }, ['#e8a33d', '#2fb3a6', '#7c5cff', '#e05a8a', '#3b82f6'].map(color => h('button', {
+            type: 'button',
+            key: color,
+            className: 'np-accent-swatch' + ((settings.accent || '#e8a33d').toLowerCase() === color ? ' active' : ''),
+            style: { '--swatch': color },
+            title: color,
+            onClick: () => set({ accent: color }),
+          }))),
+          h('button', { type: 'button', className: 'np-btn np-sm np-outline', onClick: () => set({ accent: '#e8a33d' }) }, t('accentReset')),
+        ),
+        h('span', { className: 'np-settings-note' }, t('accentHint')),
+      ),
+      h('div', { className: 'np-field' },
         h('label', null, t('wrap')),
         h(Toggle, { checked: settings.wrap, onChange: value => set({ wrap: value }), label: '' }),
       ),
@@ -1479,6 +1518,14 @@ function AssociationModal() {
     setText(value)
     try { localStorage.setItem('dsh.ai-notepad.extensions.v1', value) } catch {}
   }
+  const toggleExtension = extension => {
+    const current = parseExtensions(text)
+    const next = current.includes(extension)
+      ? current.filter(item => item !== extension)
+      : current.concat(extension)
+    saveText(next.join(', '))
+  }
+  const selectedExtensions = parseExtensions(text)
   const doInstall = async () => {
     setBusy(true)
     try { await installAssociations(extensions); await refresh(text) } finally { setBusy(false) }
@@ -1506,6 +1553,15 @@ function AssociationModal() {
         h('div', { style: { height: 10 } }),
         h('div', { className: 'np-field-col' },
           h('label', { htmlFor: 'np-exts' }, t('extensions')),
+          h('div', { className: 'np-ext-presets' }, ASSOC_PRESETS.map(([extension, label]) => h('button', {
+            type: 'button',
+            key: extension,
+            className: 'np-ext-preset' + (selectedExtensions.includes(extension) ? ' active' : ''),
+            onClick: () => toggleExtension(extension),
+            title: '.' + extension,
+          }, label, h('span', null, '.' + extension))),
+          ),
+          h('span', { className: 'np-settings-note' }, t('extensionsPresetHint')),
           h('textarea', {
             id: 'np-exts',
             className: 'np-textarea',
@@ -1558,6 +1614,7 @@ export function NotepadSettingsPage() {
       '--np-line-height': state.settings.lineHeight,
       '--np-preview-scale': state.settings.previewScale,
       '--np-editor-weight': state.settings.fontWeight,
+      '--np-spark': state.settings.accent || '#e8a33d',
     },
   },
     h('h2', null, 'AI Notepad'),

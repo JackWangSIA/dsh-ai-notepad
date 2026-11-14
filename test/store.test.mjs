@@ -240,3 +240,15 @@ test('a stale selection is never replaced', async () => {
   store.acceptReview()
   assert.equal(store.activeDoc().content, 'Hello brave world')
 })
+
+test('new documents default to Markdown and extension presets normalize', () => {
+  store.newFile()
+  assert.match(store.activeDoc().name, /\.md$/)
+  assert.deepEqual(store.parseExtensions(' .md, txt；JSON\nMARKDOWN '), ['md', 'txt', 'json', 'markdown'])
+})
+
+test('accent color has a default and persists through settings', () => {
+  assert.equal(store.DEFAULT_SETTINGS.accent, '#e8a33d')
+  store.persistSettings({ accent: '#2fb3a6' })
+  assert.equal(store.getState().settings.accent, '#2fb3a6')
+})

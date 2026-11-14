@@ -46,8 +46,9 @@ On DSH Desktop, prefer **Plugins → Add plugin** with the repository URL. The `
 - Encoding-aware I/O: UTF-8, UTF-8 BOM, UTF-16 LE/BE, GB18030/GBK and Windows-1252. Saves preserve the detected encoding, BOM and dominant line ending. GB18030/Windows-1252 round-trip checks refuse lossy writes.
 - Binary-file detection protects files from accidental text editing.
 - Hash-based compare-before-write: if another program changed the file while it was open, the save returns a conflict and does not write.
-- Selection-scoped AI editing uses four pairs: concise/expand, bullets/paragraphs, plain/advanced wording, and grammar/common-sense proofreading. Buttons run immediately and include hover descriptions. The floating selection card repeats the pairs and adds an inline instruction box; `Enter` runs it, `Shift+Enter` inserts a newline in the rail textarea, and the prompt clears after each run.
-- The chrome follows DeepSeek Harness theme tokens (surfaces, labels, borders and brand accent); the default `system` theme tracks DSH light/dark.
+- Selection-scoped AI editing uses four pairs: more concise/richer, bullets/paragraphs, simpler/more advanced wording, and check grammar/check common sense. Buttons run immediately and include hover descriptions. The floating selection card repeats the pairs and adds an inline instruction box; `Enter` runs it, `Shift+Enter` inserts a newline in the rail textarea, and the prompt clears after each run.
+- The chrome follows DeepSeek Harness theme tokens (surfaces, labels, borders and brand accent); the default `system` theme tracks DSH light/dark. A customizable accent color highlights paired buttons, selection cards and the brand mark.
+- New documents default to Markdown and use a `.md` filename.
 - AI changes apply immediately. The rail keeps a **Review change** / **Revert change** action for the last result; review shows the diff without blocking the editor, and revert restores the previous text. `Ctrl+Z` remains available.
 - Whole-document AI: polish, concise, summarize, outline and title generation.
 - Every AI change is kept in a per-document history. Open **Change history** in the rail to view any diff, or revert one non-overlapping change while keeping later edits. Changes that overlap later content, or whole-document changes followed by more edits, are marked as not independently revertible instead of silently dropping later work.
@@ -62,6 +63,7 @@ On DSH Desktop, prefer **Plugins → Add plugin** with the repository URL. The `
 - **About** sits beside File and View: version, build/update time, feature overview, shortcut reference, live runtime information (platform, current model, association status), recent updates, usage boundaries, and a one-click “copy version info” action. Version and build time are injected by `scripts/build.mjs` from `package.json` and the build clock.
 - Windows per-user file associations: ProgID, `OpenWithProgids`, `RegisteredApplications` and a lightweight VBS launcher that writes paths to an inbox and starts/focuses DSH. The Host watcher consumes the queue and the Client opens the files.
 - Association status, install, remove and restore actions are in View → File associations.
+- Click format chips (`.md`, `.txt`, `.json`, `.html`, etc.) to add or remove extensions; the comma-separated field is normalized automatically.
 
 ## Shortcuts
 

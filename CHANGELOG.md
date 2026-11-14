@@ -4,8 +4,11 @@ All notable changes to AI Notepad are documented here.
 
 ## 1.2.3 — 2026-11-14
 
-- Selection actions are now paired: concise/expand, bullets/paragraphs, plain/advanced, grammar/common-sense proofreading. Each pair runs immediately from the rail, with hover descriptions.
-- The selection floating card now includes the paired actions plus an inline custom-instruction input.
+- Selection actions are now paired: more concise/richer, bullets/paragraphs, simpler/more advanced, check grammar/check common sense. Each pair runs immediately and has hover descriptions; paired buttons are centered inside a shared button strip with a relation marker.
+- The selection floating card now mirrors the pairs and adds an inline custom-instruction input.
+- Added a customizable accent color for paired controls, selection cards and brand details.
+- New documents default to Markdown (`.md`).
+- File associations now provide clickable format buttons that add or remove extensions and normalize the comma-separated value.
 - History can now revert one non-overlapping change while keeping later changes. Overlapping or whole-document follow-up changes are marked as not independently revertible instead of silently discarding later work.
 - Full-document quick actions are unchanged.
 
