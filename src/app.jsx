@@ -374,6 +374,8 @@ const ASSOC_PRESETS = [
 const FULL_ACTIONS = [
   ['polish', 'polish', 'descFullPolish'],
   ['concise', 'concise', 'descFullConcise'],
+  ['proofread', 'proofreadFull', 'descFullProofread'],
+  ['restructure', 'restructure', 'descFullRestructure'],
   ['summarize', 'summarize', 'descSummarize'],
   ['outline', 'outline', 'descOutline'],
   ['titles', 'titles', 'descTitles'],
