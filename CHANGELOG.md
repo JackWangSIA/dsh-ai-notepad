@@ -4,6 +4,11 @@ All notable changes to AI Notepad are documented here.
 
 ## 1.2.3 — 2026-11-14
 
+- Added crash-safe autosave to a bounded on-disk recovery store; it debounces edits, keeps no duplicate full-text copy in memory, and offers restore/discard after restart.
+- Moved the preview/edit toggle to a floating control at the top-right of the editor area.
+- Moved change history to a prominent top-toolbar button with an active count.
+- Removed the duplicate custom tooltip path; action buttons now use a single hover description.
+
 - Selection actions are now paired: more concise/richer, bullets/paragraphs, simpler/more advanced, check grammar/check common sense. Each pair runs immediately and has hover descriptions; paired buttons are centered inside a shared button strip with a relation marker.
 - The selection floating card now mirrors the pairs and adds an inline custom-instruction input.
 - Added a customizable accent color for paired controls, selection cards and brand details.

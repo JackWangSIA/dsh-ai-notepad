@@ -252,3 +252,24 @@ test('accent color has a default and persists through settings', () => {
   store.persistSettings({ accent: '#2fb3a6' })
   assert.equal(store.getState().settings.accent, '#2fb3a6')
 })
+
+test('dirty edits schedule an autosave request without keeping a second copy', async () => {
+  const originalFetch = globalThis.fetch
+  let autosaveBody = null
+  globalThis.fetch = async (url, init) => {
+    if (String(url).endsWith('/autosave')) autosaveBody = JSON.parse(init.body)
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }
+  try {
+    store.getState().host = { platform: 'win32' }
+    store.newFile()
+    const doc = store.activeDoc()
+    store.updateDocContent(doc.id, 'crash-safe draft', null, null, { line: 1, column: 1 })
+    await new Promise(resolve => setTimeout(resolve, 1200))
+    assert.equal(autosaveBody?.action, 'save')
+    assert.equal(autosaveBody?.content, 'crash-safe draft')
+  } finally {
+    store.getState().host = null
+    globalThis.fetch = originalFetch
+  }
+})

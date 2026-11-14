@@ -362,8 +362,7 @@ export const CSS = `
 .np-ai-section{background:color-mix(in srgb,var(--np-panel) 82%,transparent);border:1px solid var(--np-border);border-radius:12px;padding:10px;margin-bottom:11px;box-shadow:0 1px 2px rgba(20,30,50,.03)}
 .np-ai-section .np-ai-label{margin-bottom:8px}
 .np-selbox{background:var(--np-bg);border-left:3px solid var(--np-accent-2);border-radius:6px;line-height:1.55}
-.np-action{position:relative;min-height:35px;border-radius:8px;font-size:12.5px;background:var(--np-panel)}
-.np-action[data-tip]:hover::after{content:attr(data-tip);position:absolute;z-index:80;left:0;top:calc(100% + 6px);width:max-content;max-width:230px;padding:6px 8px;border:1px solid var(--np-border-strong);border-radius:7px;background:var(--np-panel-2);color:var(--np-text);font-size:11px;font-weight:400;line-height:1.45;text-align:left;box-shadow:var(--np-shadow);pointer-events:none;white-space:normal}
+.np-action{min-height:35px;border-radius:8px;font-size:12.5px;background:var(--np-panel)}
 .np-action:hover{transform:translateY(-1px);box-shadow:0 4px 10px color-mix(in srgb,var(--np-accent) 15%,transparent);background:var(--np-accent-soft)}
 .np-action.active{background:var(--np-accent-soft);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--np-accent) 38%,transparent)}
 .np-ai-footer{background:color-mix(in srgb,var(--np-panel) 82%,transparent);padding:9px 12px}
@@ -450,6 +449,12 @@ export const CSS = `
 .np-preview-shell{position:absolute;inset:0;overflow:hidden;background:var(--np-bg)}
 .np-preview{padding-top:60px!important;background:radial-gradient(100% 80% at 50% 0,color-mix(in srgb,var(--np-accent) 4%,var(--np-bg)) 0%,var(--np-bg) 50%)}
 .np-preview > *{content-visibility:auto;contain-intrinsic-size:auto 1.8em}
+.np-mode-float{position:absolute;z-index:25;top:11px;right:14px;display:inline-flex;align-items:center;gap:5px;min-height:29px;padding:4px 8px;border:1px solid var(--np-border-strong);border-radius:7px;background:color-mix(in srgb,var(--np-panel) 90%,transparent);color:var(--np-text-2);font-size:11.5px;box-shadow:0 3px 12px rgba(0,0,0,.12);backdrop-filter:blur(6px)}
+.np-mode-float:hover{background:var(--np-panel);color:var(--np-text);border-color:var(--np-accent)}
+.np-mode-float .np-kbd{font-size:9.5px;padding:1px 4px}
+.np-history-toggle.has-history{background:var(--np-accent-soft);border-color:color-mix(in srgb,var(--np-accent) 28%,transparent);color:var(--np-accent)}
+.np-history-toggle.has-history:hover{background:color-mix(in srgb,var(--np-accent) 18%,var(--np-panel));color:var(--np-accent)}
+.np-history-toggle .np-badge{padding:0 4px;min-width:16px;justify-content:center;font-size:9.5px}
 .np-previewbar{position:absolute;z-index:7;top:12px;right:16px;left:16px;display:flex;align-items:center;justify-content:space-between;pointer-events:none}
 .np-previewbar>*{pointer-events:auto}
 .np-preview-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;background:color-mix(in srgb,var(--np-panel) 88%,transparent);border:1px solid var(--np-border);color:var(--np-text-2);font-size:11px;box-shadow:0 2px 8px rgba(20,30,50,.06);backdrop-filter:blur(6px)}
@@ -460,6 +465,12 @@ export const CSS = `
 .np-accent-swatches{display:flex;align-items:center;gap:6px}
 .np-accent-swatch{width:22px;height:22px;padding:0;border:2px solid transparent;border-radius:50%;background:var(--swatch);box-shadow:0 0 0 1px var(--np-border);cursor:pointer}
 .np-accent-swatch.active{border-color:var(--np-text);box-shadow:0 0 0 2px var(--np-panel)}
+.np-autosave-list{display:flex;flex-direction:column;gap:8px;margin-top:12px;max-height:360px;overflow:auto}
+.np-autosave-row{display:flex;align-items:center;gap:12px;padding:10px 11px;border:1px solid var(--np-border);border-radius:9px;background:var(--np-panel-2)}
+.np-autosave-info{min-width:0;flex:1;display:flex;flex-direction:column;gap:3px}
+.np-autosave-info b{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.np-autosave-info small{font-size:10.5px;color:var(--np-text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.np-autosave-actions{display:flex;gap:6px;flex:none}
 .np-settings-page .np-settings-card{background:var(--np-panel)}
 .np-settings-page{padding:22px 24px 30px;max-width:900px}
 .np-settings-page h2{font-size:18px;letter-spacing:-.01em}

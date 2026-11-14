@@ -7,6 +7,11 @@ import {
   closeDoc,
   copySelection,
   ensureInitialDoc,
+  loadAutosaves,
+  closeAutosave,
+  restoreAutosave,
+  discardAutosave,
+  discardAllAutosaves,
   loadFonts,
   loadHostStatus,
   newFile,
@@ -210,6 +215,7 @@ function ViewMenuButton() {
 function Topbar() {
   const state = useNotepad()
   const doc = activeDoc()
+  const historyCount = doc ? state.history.filter(item => item.docId === doc.id).length : 0
   return h('div', { className: 'np-topbar' },
     h('div', { className: 'np-brand' },
       h('span', { className: 'np-brand-mark' }, h(NotepadIcon, { size: 21 })),
@@ -239,16 +245,17 @@ function Topbar() {
         disabled: !doc,
         title: t('save') + ' (Ctrl+S)',
       }, h(SaveIcon, { size: 15 }), h('span', null, t('save'))),
-      previewKind(doc) ? h('button', {
+      h('button', {
         type: 'button',
-        className: 'np-btn np-preview-toggle' + (doc.preview ? ' np-active' : ''),
-        onClick: () => setPreview(doc.id, !doc.preview),
-        title: t('togglePreview') + ' (Ctrl+E)',
+        className: 'np-btn np-history-toggle' + (historyCount ? ' has-history' : ''),
+        disabled: !doc || historyCount === 0,
+        onClick: () => openHistory(),
+        title: t('history'),
       },
-        doc.preview ? h(EditIcon, { size: 14 }) : h(EyeIcon, { size: 14 }),
-        h('span', { className: 'np-label' }, doc.preview ? t('edit') : t('preview')),
-        h('span', { className: 'np-kbd' }, 'Ctrl+E'),
-      ) : null,
+        h(DiffIcon, { size: 14 }),
+        h('span', { className: 'np-label' }, t('history')),
+        historyCount ? h('span', { className: 'np-badge' }, historyCount) : null,
+      ),
       h('button', {
         type: 'button',
         className: 'np-btn np-ai-toggle' + (state.ai.open ? ' np-active' : ''),
@@ -452,7 +459,6 @@ function AIPanel({ doc }) {
   if (state.historyOpen) {
     return h('aside', { className: 'np-ai np-ai-review', 'aria-label': t('history') }, h(HistoryPanel, { doc }))
   }
-  const docHistory = state.history.filter(item => item.docId === doc.id)
   const selection = doc.selection
   const hasSelection = !!(selection && selection.text)
   const mappable = hasSelection && selection.from >= 0
@@ -463,13 +469,6 @@ function AIPanel({ doc }) {
   return h('aside', { className: 'np-ai', 'aria-label': t('aiEdit') },
     h('div', { className: 'np-ai-head' },
       h('div', { className: 'np-ai-title' }, h(SparkIcon, { size: 16 }), t('aiEdit')),
-      h('button', {
-        type: 'button',
-        className: 'np-btn np-sm np-outline',
-        disabled: docHistory.length === 0,
-        onClick: () => openHistory(),
-        title: t('history'),
-      }, t('history'), docHistory.length ? h('span', { className: 'np-badge' }, docHistory.length) : null),
       h(IconButton, { title: t('close'), onClick: () => closeAI() }, h(CloseIcon, { size: 14 })),
     ),
     h('div', { className: 'np-ai-body' },
@@ -501,7 +500,6 @@ function AIPanel({ doc }) {
           className: 'np-action',
           disabled: !mappable || state.ai.loading,
           title: mappable ? t(desc) : t('selectFirst'),
-          'data-tip': mappable ? t(desc) : t('selectFirst'),
           onClick: () => runPreset(key, 'selection'),
         }, t(label)))))),
       ),
@@ -541,7 +539,6 @@ function AIPanel({ doc }) {
           className: 'np-action',
           disabled: state.ai.loading,
           title: t(desc),
-          'data-tip': t(desc),
           onClick: () => runPreset(key, 'document'),
         }, t(label)))),
       ),
@@ -793,6 +790,16 @@ export function EditorPane() {
         h('button', { type: 'button', className: 'np-btn np-sm', onClick: () => overwriteDoc(doc.id) }, t('overwrite')),
       ) : null,
       h('div', { className: 'np-editor-wrap' },
+        kind ? h('button', {
+          type: 'button',
+          className: 'np-mode-float',
+          onClick: () => setPreview(doc.id, !doc.preview),
+          title: t('togglePreview') + ' (Ctrl+E)',
+        },
+          doc.preview ? h(EditIcon, { size: 13 }) : h(EyeIcon, { size: 13 }),
+          h('span', null, doc.preview ? t('edit') : t('preview')),
+          h('span', { className: 'np-kbd' }, 'Ctrl+E'),
+        ) : null,
         preview
           ? h('div', { className: 'np-preview-shell' + (kind === 'html' ? ' np-preview-shell-html' : '') },
             h('div', { className: 'np-previewbar' },
@@ -854,7 +861,10 @@ function NotepadAppInner() {
   sizeRef.current = state.settings.fontSize
   React.useEffect(() => {
     ensureInitialDoc()
-    loadHostStatus().then(() => loadFonts())
+    loadHostStatus().then(() => {
+      loadFonts()
+      loadAutosaves()
+    })
     const current = activeDoc()
     api('/client-report', {
       mounted: true,
@@ -932,6 +942,7 @@ function NotepadAppInner() {
     state.settingsOpen ? h(SettingsModal) : null,
     state.aboutOpen ? h(AboutModal) : null,
     state.associationOpen ? h(AssociationModal) : null,
+    state.autosaveOpen ? h(AutosaveModal) : null,
     state.toast ? h('div', { className: 'np-toast ' + (state.toast.kind || '') }, state.toast.text) : null,
   )
 }
@@ -1341,6 +1352,59 @@ function formatBuildTime(value) {
   } catch {
     return String(value)
   }
+}
+
+function AutosaveModal() {
+  const state = useNotepad()
+  if (!state.autosaveOpen) return null
+  const entries = state.autosaves || []
+  const close = () => closeAutosave()
+  return h('div', { className: 'np-overlay', onMouseDown: event => { if (event.target === event.currentTarget) close() } },
+    h('div', { className: 'np-modal small np-autosave-modal', role: 'dialog', 'aria-modal': 'true' },
+      h('div', { className: 'np-modal-head' },
+        h(SaveIcon, { size: 18 }),
+        h('div', { className: 'np-modal-title' }, t('autosaveTitle')),
+        h(IconButton, { title: t('close'), onClick: close }, h(CloseIcon)),
+      ),
+      h('div', { className: 'np-modal-body' },
+        h('p', { className: 'np-hint', style: { marginTop: 0 } }, t('autosaveHint')),
+        h('div', { className: 'np-autosave-list' }, entries.map(item => h('div', { className: 'np-autosave-row', key: item.id },
+          h('div', { className: 'np-autosave-info' },
+            h('b', null, item.name || t('autosaveUnsaved')),
+            item.path ? h('small', null, t('autosaveOriginalPath') + ': ' + item.path) : null,
+            h('small', null,
+              new Date(item.updatedAt || Date.now()).toLocaleString() + ' · ' +
+              (Number(item.size || 0) < 1024 ? Number(item.size || 0) + ' B' : (Number(item.size || 0) / 1024).toFixed(1) + ' KB'),
+            ),
+          ),
+          h('div', { className: 'np-autosave-actions' },
+            h('button', {
+              type: 'button',
+              className: 'np-btn np-sm np-primary',
+              disabled: state.autosaveBusy,
+              onClick: () => restoreAutosave(item.id),
+            }, t('autosaveRestore')),
+            h('button', {
+              type: 'button',
+              className: 'np-btn np-sm np-outline',
+              disabled: state.autosaveBusy,
+              onClick: () => discardAutosave(item.id),
+            }, t('autosaveDiscard')),
+          ),
+        ))),
+      ),
+      h('div', { className: 'np-modal-foot' },
+        h('button', {
+          type: 'button',
+          className: 'np-btn np-sm np-danger',
+          disabled: state.autosaveBusy || entries.length === 0,
+          onClick: () => discardAllAutosaves(),
+        }, t('autosaveDiscardAll')),
+        h('span', { className: 'np-grow' }),
+        h('button', { type: 'button', className: 'np-btn np-sm np-outline', onClick: close }, t('autosaveLater')),
+      ),
+    ),
+  )
 }
 
 function AboutModal() {

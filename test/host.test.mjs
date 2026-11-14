@@ -166,6 +166,29 @@ test('host routes expose read/write, AI and inbox operations', async () => {
     assert.equal(status.json.ok, true)
     assert.equal(status.json.model.model, 'test-model')
 
+    const autosave = await call('/autosave', {
+      action: 'save',
+      id: 'doc-autosave-test',
+      name: 'draft.md',
+      content: '# Draft\n\ncrash-safe text',
+      encoding: 'utf-8',
+      eol: '\n',
+    })
+    assert.equal(autosave.json.ok, true)
+    const autosaveList = await call('/autosave', { action: 'list' })
+    assert.ok(autosaveList.json.entries.some(item => item.id === 'doc-autosave-test'))
+    const autosaveRead = await call('/autosave', { action: 'read', id: 'doc-autosave-test' })
+    assert.equal(autosaveRead.json.content, '# Draft\n\ncrash-safe text')
+    await call('/autosave', {
+      action: 'save',
+      id: 'doc-autosave-test',
+      name: 'draft.md',
+      content: '# Draft\n\nupdated text',
+    })
+    const autosaveUpdated = await call('/autosave', { action: 'read', id: 'doc-autosave-test' })
+    assert.equal(autosaveUpdated.json.content, '# Draft\n\nupdated text')
+    await call('/autosave', { action: 'drop', id: 'doc-autosave-test' })
+
     const read = await call('/read', { path: file })
     assert.equal(read.json.content, 'A\r\nB')
     assert.equal(read.json.eol, '\r\n')

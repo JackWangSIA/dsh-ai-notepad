@@ -195,6 +195,17 @@ const MESSAGES = {
     associationRestore: '卸载并恢复',
     associationDefault: '打开 Windows 默认应用',
     associationOpenWith: '选择默认打开方式',
+    autosaveTitle: '发现自动保存的内容',
+    autosaveHint: '上次退出前有未保存的修改。恢复后会作为新的未保存文档打开，不会直接覆盖原文件。',
+    autosaveRestore: '恢复',
+    autosaveDiscard: '丢弃',
+    autosaveDiscardAll: '全部丢弃',
+    autosaveLater: '稍后',
+    autosaveRestored: '已恢复自动保存的内容',
+    autosaveRestoreFailed: '恢复自动保存内容失败',
+    autosaveDiscardFailed: '丢弃自动保存内容失败',
+    autosaveOriginalPath: '原文件',
+    autosaveUnsaved: '未命名文档',
     associationDefaultHint: 'Windows 10/11 禁止程序静默修改默认应用。注册后请右键文件 →「打开方式」→ 选择本应用并勾选「始终使用」。',
     associationNone: '尚未注册',
     associationRegistered: '已注册',
@@ -413,6 +424,17 @@ const MESSAGES = {
     associationRestore: 'Uninstall and restore',
     associationDefault: 'Open Windows Default Apps',
     associationOpenWith: 'Choose default app',
+    autosaveTitle: 'Recovered autosave',
+    autosaveHint: 'There were unsaved changes before the app last exited. A restored item opens as a new unsaved document and never overwrites the original file.',
+    autosaveRestore: 'Restore',
+    autosaveDiscard: 'Discard',
+    autosaveDiscardAll: 'Discard all',
+    autosaveLater: 'Later',
+    autosaveRestored: 'Autosave restored',
+    autosaveRestoreFailed: 'Could not restore autosave',
+    autosaveDiscardFailed: 'Could not discard autosave',
+    autosaveOriginalPath: 'Original file',
+    autosaveUnsaved: 'Untitled document',
     associationDefaultHint: 'Windows 10/11 protects the default app choice. After registering, use Open with → choose this app → “Always use”.',
     associationNone: 'Not registered',
     associationRegistered: 'Registered',
@@ -566,6 +588,9 @@ const state = {
   associationOpen: false,
   association: null,
   associationBusy: false,
+  autosaves: [],
+  autosaveOpen: false,
+  autosaveBusy: false,
   fonts: null,
   model: null,
   host: null,
@@ -632,12 +657,65 @@ export function previewKind(doc) {
   return null
 }
 
+const autosaveTimers = new Map()
+const AUTOSAVE_DELAY = 1000
+
+function clearAutosave(id) {
+  const timer = autosaveTimers.get(id)
+  if (timer) {
+    clearTimeout(timer)
+    autosaveTimers.delete(id)
+  }
+  if (!id) return
+  if (!state.host) return
+  api('/autosave', { action: 'drop', id }).catch(() => {})
+  setTimeout(() => {
+    const current = state.docs.find(item => item.id === id)
+    if (!current || !current.dirty) api('/autosave', { action: 'drop', id }).catch(() => {})
+  }, AUTOSAVE_DELAY + 300)
+}
+
+function scheduleAutosave(doc) {
+  if (!doc || !doc.id) return
+  const existing = autosaveTimers.get(doc.id)
+  if (existing) {
+    clearTimeout(existing)
+    autosaveTimers.delete(doc.id)
+  }
+  if (!doc.dirty) {
+    clearAutosave(doc.id)
+    return
+  }
+  if (!state.host) return
+  const timer = setTimeout(() => {
+    autosaveTimers.delete(doc.id)
+    const current = state.docs.find(item => item.id === doc.id)
+    if (!current || !current.dirty) return
+    api('/autosave', {
+      action: 'save',
+      id: current.id,
+      name: current.name,
+      path: current.path,
+      encoding: current.encoding,
+      bom: current.bom,
+      eol: current.eol,
+      content: current.content,
+    }).catch(() => {})
+  }, AUTOSAVE_DELAY)
+  autosaveTimers.set(doc.id, timer)
+}
+
 function replaceDoc(id, patch) {
   const index = state.docs.findIndex(doc => doc.id === id)
   if (index === -1) return null
-  const next = typeof patch === 'function' ? patch(state.docs[index]) : { ...state.docs[index], ...patch }
+  const previous = state.docs[index]
+  const next = typeof patch === 'function' ? patch(previous) : { ...previous, ...patch }
   const docs = state.docs.slice()
   docs[index] = next
+  if (next.content !== previous.content) {
+    if (next.dirty) scheduleAutosave(next)
+    else clearAutosave(next.id)
+  }
   return { docs, doc: next }
 }
 
@@ -1122,6 +1200,7 @@ export async function saveDoc(id = state.activeId, { saveAs = false } = {}) {
     })
     rememberRecent(result.path)
     if (updated) emit({ docs: updated.docs })
+    clearAutosave(id)
     toast(t('saved'), 'success', 1600)
     return true
   } catch (error) {
@@ -1804,6 +1883,94 @@ export async function loadHostStatus() {
     return result
   } catch {
     return null
+  }
+}
+
+export async function loadAutosaves() {
+  try {
+    const result = await api('/autosave', { action: 'list' })
+    state.autosaves = Array.isArray(result.entries) ? result.entries : []
+    state.autosaveOpen = state.autosaves.length > 0
+    emit({})
+  } catch {
+    return []
+  }
+  return state.autosaves
+}
+
+export function closeAutosave() {
+  state.autosaveOpen = false
+  emit({})
+}
+
+export async function restoreAutosave(id) {
+  const entry = state.autosaves.find(item => item.id === id)
+  if (!entry) return
+  state.autosaveBusy = true
+  emit({})
+  try {
+    const result = await api('/autosave', { action: 'read', id })
+    const doc = newDoc(entry.name)
+    const recovered = {
+      ...doc,
+      path: null,
+      name: entry.name || doc.name,
+      content: result.content || '',
+      savedContent: '',
+      dirty: true,
+      encoding: entry.encoding || 'utf-8',
+      bom: entry.bom === true,
+      eol: entry.eol === '\r\n' ? '\r\n' : '\n',
+      size: (result.content || '').length,
+      preview: false,
+      selection: { from: 0, to: 0, text: '', coords: null },
+      cursor: { line: 1, column: 1 },
+    }
+    state.docs = state.docs.concat(recovered)
+    state.activeId = recovered.id
+    state.history = state.history.filter(item => item.docId !== recovered.id)
+    state.autosaves = state.autosaves.filter(item => item.id !== id)
+    state.autosaveOpen = state.autosaves.length > 0
+    scheduleAutosave(recovered)
+    emit({})
+    api('/autosave', { action: 'drop', id }).catch(() => {})
+    toast(t('autosaveRestored'), 'success', 2600)
+  } catch (error) {
+    toast(error.message || t('autosaveRestoreFailed'), 'error', 5000)
+  } finally {
+    state.autosaveBusy = false
+    emit({})
+  }
+}
+
+export async function discardAutosave(id) {
+  state.autosaveBusy = true
+  emit({})
+  try {
+    await api('/autosave', { action: 'drop', id })
+    state.autosaves = state.autosaves.filter(item => item.id !== id)
+    state.autosaveOpen = state.autosaves.length > 0
+    emit({})
+  } catch (error) {
+    toast(error.message || t('autosaveDiscardFailed'), 'error', 4000)
+  } finally {
+    state.autosaveBusy = false
+    emit({})
+  }
+}
+
+export async function discardAllAutosaves() {
+  if (state.autosaves.length === 0) return
+  state.autosaveBusy = true
+  emit({})
+  try {
+    await Promise.all(state.autosaves.map(item => api('/autosave', { action: 'drop', id: item.id }).catch(() => {})))
+    state.autosaves = []
+    state.autosaveOpen = false
+    emit({})
+  } finally {
+    state.autosaveBusy = false
+    emit({})
   }
 }
 
