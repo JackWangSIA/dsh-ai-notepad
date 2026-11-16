@@ -4,6 +4,8 @@ import { lineDiff } from './diff.js'
 const SETTINGS_KEY = 'dsh.ai-notepad.settings.v1'
 const RECENT_KEY = 'dsh.ai-notepad.recent.v1'
 const REV_KEY = 'dsh.ai-notepad.inbox-rev.v1'
+const SESSION_KEY = 'dsh.ai-notepad.session.v1'
+const POSITIONS_KEY = 'dsh.ai-notepad.positions.v1'
 
 export const DEFAULT_SETTINGS = Object.freeze({
   fontFamily: 'Microsoft YaHei UI',
@@ -13,7 +15,6 @@ export const DEFAULT_SETTINGS = Object.freeze({
   wrap: true,
   theme: 'system',
   accent: '#e8a33d',
-  lineNumbers: true,
   tabSize: 2,
   previewScale: 1.05,
   aiPanelOpen: true,
@@ -120,6 +121,7 @@ const MESSAGES = {
     dirty: '未保存',
     chars: '字符',
     words: '词',
+    lines: '行',
     line: '行',
     column: '列',
     encoding: '编码',
@@ -173,7 +175,7 @@ const MESSAGES = {
     limitAssoc: 'Windows 默认应用仍受 UserChoice 哈希保护，注册 Open With 后需要手动选择一次“始终使用”。',
     limitEditor: '预览是快速查看模式，可通过右上角按钮或 Ctrl+E 回到编辑，不提供完整的 WYSIWYG 富文本编辑。',
     limitSize: '单文件读取上限 64 MiB（超过 16 MiB 会提示大文件）；全文 AI 上下文约 120k 字符，超长文档会截断中间上下文。',
-    aboutUpdateCurrent: '当前版本：崩溃安全自动保存；编辑区悬浮预览/编辑；顶部修改历史；四对选区 AI 与浮动输入框；非重叠修改可单独回退。',
+    aboutUpdateCurrent: '当前版本：崩溃安全自动保存与上次会话恢复；Markdown 标题折叠；选区完成后再弹出 AI 卡片；保留编辑/预览位置。',
     aboutUpdatePrev: '此前版本：搜索式字体选择器、Ctrl+滚轮缩放、Markdown 预览、Windows 文件关联与启动器。',
     fontSearch: '搜索字体…',
     fontRecommended: '推荐',
@@ -222,7 +224,6 @@ const MESSAGES = {
     accent: '点缀色',
     accentReset: '恢复默认',
     accentHint: '用于成对按钮、选区卡片、品牌标记等细节；可点色块或使用取色器。',
-    lineNumbers: '显示行号',
     tabSize: 'Tab 宽度',
     previewScale: '预览字号比例',
     normal: '普通',
@@ -349,6 +350,7 @@ const MESSAGES = {
     dirty: 'Unsaved',
     chars: 'chars',
     words: 'words',
+    lines: 'lines',
     line: 'Line',
     column: 'Col',
     encoding: 'Encoding',
@@ -402,7 +404,7 @@ const MESSAGES = {
     limitAssoc: 'Windows still protects the default-app choice with UserChoice. After registering Open With, choose “Always use” once.',
     limitEditor: 'Preview is a quick reading mode; use the top-right button or Ctrl+E to return to editing. It is not a full WYSIWYG editor.',
     limitSize: 'File read limit 64 MiB (files over 16 MiB show a large-file warning); document AI context about 120k characters; very long documents omit the middle context.',
-    aboutUpdateCurrent: 'Current: crash-safe autosave, a floating preview/edit control, top-toolbar history, four selection AI pairs with a floating instruction box, and independent revert for non-overlapping changes.',
+    aboutUpdateCurrent: 'Current: crash-safe autosave and session restore, foldable Markdown headings, a selection popup that waits for selection to finish, and preserved editor/preview positions.',
     aboutUpdatePrev: 'Earlier: searchable font picker, Ctrl+wheel zoom, Markdown preview, Windows associations and launcher.',
     fontSearch: 'Search fonts…',
     fontRecommended: 'Recommended',
@@ -451,7 +453,6 @@ const MESSAGES = {
     accent: 'Accent color',
     accentReset: 'Reset',
     accentHint: 'Used for paired buttons, selection cards and the brand mark. Pick a swatch or use the color picker.',
-    lineNumbers: 'Line numbers',
     tabSize: 'Tab size',
     previewScale: 'Preview scale',
     normal: 'Normal',
@@ -554,6 +555,8 @@ function newDoc(name) {
     conflict: false,
     selection: { from: 0, to: 0, text: '', coords: null },
     cursor: { line: 1, column: 1 },
+    scrollTop: 0,
+    anchorLine: 1,
   }
 }
 
@@ -591,6 +594,7 @@ const state = {
   autosaves: [],
   autosaveOpen: false,
   autosaveBusy: false,
+  selectionReadyId: null,
   fonts: null,
   model: null,
   host: null,
@@ -600,6 +604,77 @@ const state = {
 }
 
 const listeners = new Set()
+
+function pathKey(value) {
+  return String(value || '').replace(/\//g, '\\').toLowerCase()
+}
+
+function readPositions() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(POSITIONS_KEY) || '{}')
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+const positionCache = readPositions()
+let sessionTimer = null
+
+function docPosition(doc) {
+  return {
+    cursor: doc.cursor || { line: 1, column: 1 },
+    scrollTop: Math.max(0, Number(doc.scrollTop) || 0),
+    anchorLine: Math.max(1, Number(doc.anchorLine) || 1),
+    at: Date.now(),
+  }
+}
+
+function saveSessionNow() {
+  if (sessionTimer) {
+    clearTimeout(sessionTimer)
+    sessionTimer = null
+  }
+  const docs = []
+  for (const doc of state.docs) {
+    if (!doc.path) continue
+    positionCache[pathKey(doc.path)] = docPosition(doc)
+    docs.push({
+      path: doc.path,
+      preview: doc.preview === true,
+      cursor: doc.cursor || { line: 1, column: 1 },
+      scrollTop: Math.max(0, Number(doc.scrollTop) || 0),
+      anchorLine: Math.max(1, Number(doc.anchorLine) || 1),
+    })
+  }
+  const entries = Object.entries(positionCache)
+    .sort((a, b) => (Number(b[1]?.at) || 0) - (Number(a[1]?.at) || 0))
+    .slice(0, 50)
+  for (const key of Object.keys(positionCache)) delete positionCache[key]
+  for (const [key, value] of entries) positionCache[key] = value
+  const active = state.docs.find(doc => doc.id === state.activeId)
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      docs: docs.slice(0, 20),
+      activePath: active?.path || null,
+      at: Date.now(),
+    }))
+    localStorage.setItem(POSITIONS_KEY, JSON.stringify(positionCache))
+  } catch {}
+}
+
+function scheduleSessionSave() {
+  if (!state.host) return
+  if (sessionTimer) return
+  sessionTimer = setTimeout(() => {
+    sessionTimer = null
+    saveSessionNow()
+  }, 350)
+}
+
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('beforeunload', () => saveSessionNow())
+}
 
 export function subscribe(fn) {
   listeners.add(fn)
@@ -621,6 +696,7 @@ function emit(patch) {
   for (const fn of listeners) {
     try { fn() } catch (error) { console.error('[ai-notepad] listener failed', error) }
   }
+  scheduleSessionSave()
 }
 
 export function t(key) {
@@ -768,12 +844,45 @@ export function updateDocContent(id, content, cmState, selection, cursor) {
       conflict: content === doc.savedContent ? false : doc.conflict,
     }
   })
+  if (selection) state.selectionReadyId = null
   if (updated && updated.doc !== state.docs.find(doc => doc.id === id)) emit({ docs: updated.docs })
 }
 
 export function setSelection(id, selection) {
+  state.selectionReadyId = null
   const updated = replaceDoc(id, { selection })
   if (updated) emit({ docs: updated.docs })
+}
+
+export function markSelectionReady(id = state.activeId) {
+  const doc = state.docs.find(item => item.id === id)
+  if (!doc || !doc.selection?.text) return
+  state.selectionReadyId = id
+  emit({})
+}
+
+export function clearSelectionReady() {
+  if (state.selectionReadyId === null) return
+  state.selectionReadyId = null
+  emit({})
+}
+
+export function setDocScroll(id, scrollTop) {
+  const doc = state.docs.find(item => item.id === id)
+  if (!doc) return
+  const value = Math.max(0, Math.round(Number(scrollTop) || 0))
+  if (doc.scrollTop === value) return
+  doc.scrollTop = value
+  scheduleSessionSave()
+}
+
+export function setDocAnchor(id, anchorLine) {
+  const doc = state.docs.find(item => item.id === id)
+  if (!doc) return
+  const line = Math.max(1, Math.round(Number(anchorLine) || 1))
+  if (doc.anchorLine === line) return
+  doc.anchorLine = line
+  scheduleSessionSave()
 }
 
 const HTML_BLOCK_TAGS = new Set([
@@ -1107,6 +1216,50 @@ export function samePath(a, b) {
   return String(a).replace(/\//g, '\\').toLowerCase() === String(b).replace(/\//g, '\\').toLowerCase()
 }
 
+function readSession() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null')
+    if (!parsed || !Array.isArray(parsed.docs)) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export async function restoreSession() {
+  const saved = readSession()
+  if (!saved || saved.docs.length === 0) return []
+  const blankOnly = state.docs.length === 1 &&
+    !state.docs[0].path && !state.docs[0].dirty && !state.docs[0].content
+  if (blankOnly) {
+    state.docs = []
+    state.activeId = null
+  }
+  for (const item of saved.docs.slice(0, 20)) {
+    if (!item.path || state.docs.some(doc => doc.path && samePath(doc.path, item.path))) continue
+    const doc = await openPath(item.path, { restore: true })
+    if (!doc) continue
+    doc.preview = item.preview === true && !!previewKind(doc)
+    if (item.cursor && Number.isFinite(Number(item.cursor.line))) {
+      doc.cursor = {
+        line: Math.max(1, Number(item.cursor.line)),
+        column: Math.max(1, Number(item.cursor.column) || 1),
+      }
+    }
+    doc.scrollTop = Math.max(0, Number(item.scrollTop) || 0)
+    doc.anchorLine = Math.max(1, Number(item.anchorLine) || 1)
+  }
+  if (state.docs.length === 0) {
+    ensureInitialDoc()
+    return []
+  }
+  const active = saved.activePath
+    ? state.docs.find(doc => doc.path && samePath(doc.path, saved.activePath))
+    : null
+  emit({ activeId: (active || state.docs[0]).id, review: null })
+  return state.docs
+}
+
 export async function openPath(filePath, options = {}) {
   if (!filePath) return
   const existing = state.docs.find(doc => doc.path && samePath(doc.path, filePath))
@@ -1138,6 +1291,12 @@ export async function openPath(filePath, options = {}) {
       readOnly: result.readOnly,
       dirty: false,
     })
+    const remembered = positionCache[pathKey(result.path)]
+    if (remembered) {
+      doc.cursor = remembered.cursor || doc.cursor
+      doc.scrollTop = Math.max(0, Number(remembered.scrollTop) || 0)
+      doc.anchorLine = Math.max(1, Number(remembered.anchorLine) || 1)
+    }
     rememberRecent(result.path)
     emit({ docs: [...state.docs, doc], activeId: doc.id, review: null })
     if (result.large) toast(t('largeFile'), 'warn', 6500)

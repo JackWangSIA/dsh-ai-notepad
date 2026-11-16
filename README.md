@@ -28,11 +28,13 @@ It combines three things that usually live in separate tools:
 ### Write and save safely
 
 - Open, edit, save, and Save As through native pickers on Windows, Linux, and macOS; dropped files also open.
-- Multi-tab editing with CodeMirror 6, undo/redo, find, line numbers, wrapping, and unsaved-change protection.
+- Multi-tab editing with CodeMirror 6, undo/redo, find, wrapping, Markdown heading folding, and unsaved-change protection.
 - UTF-8, UTF-8 BOM, UTF-16 LE/BE, GB18030/GBK, and Windows-1252 are detected automatically. Saving preserves the encoding, BOM, and dominant line ending.
 - Binary files are rejected before they can be corrupted.
 - A SHA-256 compare-before-write guard refuses to overwrite a file that another program changed while it was open.
-- New documents start as Markdown (`.md`).
+- New documents start as Markdown (`.md`). Open files, active tab, cursor and scroll positions are restored on the next start.
+- Markdown headings fold in both edit and preview modes; editor line numbers are intentionally absent.
+- The status bar shows selected characters, words and lines when a selection exists.
 
 ### Selection AI made for real editing
 
@@ -73,7 +75,9 @@ Dirty content is written to a bounded recovery store about one second after typi
 ### Markdown and HTML preview
 
 - Markdown and HTML open in preview mode by default.
+- Markdown headings have fold controls in preview; the editor exposes the same headings through fold gutters.
 - The preview/edit button floats at the **top-right of the editing area**, in both directions; `Ctrl+E` also works.
+- Switching modes preserves the last scroll and cursor position instead of jumping to the top.
 - Markdown preview HTML is cached by content, so selection and rail updates do not re-parse the whole document.
 - Markdown raw HTML is escaped; the renderer uses a conservative CommonMark subset.
 - HTML preview rewrites relative `href`, `src`, `srcset`, inline CSS, and linked CSS `url()` references through an authenticated local asset route. Relative CSS, images, and fonts resolve from the HTML file's directory.

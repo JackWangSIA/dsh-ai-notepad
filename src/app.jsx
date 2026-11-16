@@ -12,6 +12,11 @@ import {
   restoreAutosave,
   discardAutosave,
   discardAllAutosaves,
+  restoreSession,
+  markSelectionReady,
+  clearSelectionReady,
+  setDocScroll,
+  setDocAnchor,
   loadFonts,
   loadHostStatus,
   newFile,
@@ -296,7 +301,11 @@ function StatusBar({ doc }) {
   if (!doc) return h('div', { className: 'np-statusbar' }, h('span', null, t('noFile')))
   const chars = doc.content.length
   const words = wordCount(doc.content)
-  const model = state.model ? `${state.model.provider}/${state.model.model}` : '—'
+  const selectedText = doc.selection?.text || ''
+  const selectedChars = selectedText.length
+  const selectedWords = selectedText ? wordCount(selectedText) : 0
+  const selectedLines = selectedText ? selectedText.split('\n').length : 0
+  const model = state.model ? `${state.model.provider}/${state.model.model}` : "—"
   return h('div', { className: 'np-statusbar' },
     h('span', { className: 'np-status-item np-status-path', title: doc.path || doc.name }, doc.path || doc.name),
     h('span', { className: 'np-status-item' }, doc.dirty
@@ -306,6 +315,16 @@ function StatusBar({ doc }) {
         : h('span', { className: 'np-badge' }, t('untitled'))),
     doc.readOnly ? h('span', { className: 'np-badge ro' }, t('readOnly')) : null,
     h('span', { className: 'np-grow' }),
+    selectedChars ? h('span', {
+      className: 'np-status-item np-selection-stat',
+      title: t('selection'),
+    },
+      h('b', null, t('selection')),
+      ' ',
+      selectedChars.toLocaleString(), ' ', t('chars'),
+      ' · ', selectedWords.toLocaleString(), ' ', t('words'),
+      selectedLines > 1 ? ' · ' + selectedLines + ' ' + t('lines') : null,
+    ) : null,
     h('span', { className: 'np-status-item' }, h('b', null, t('line')), ' ', doc.cursor?.line || 1, '  ', h('b', null, t('column')), ' ', doc.cursor?.column || 1),
     h('span', { className: 'np-status-item' }, chars.toLocaleString(), ' ', t('chars'), ' · ', words.toLocaleString(), ' ', t('words')),
     h('span', { className: 'np-status-item' }, h('b', null, t('encoding')), ' ', doc.encoding.toUpperCase(), ' · ', doc.eol === '\r\n' ? 'CRLF' : 'LF'),
@@ -392,6 +411,7 @@ function FloatingBar({ doc }) {
   const state = useNotepad()
   const selection = doc.selection
   if (!selection || !selection.text || !selection.coords || !doc) return null
+  if (state.selectionReadyId !== doc.id) return null
   const instruction = state.ai.instruction
   const hasInstruction = instruction.trim() !== ''
   const runPreset = action => event => {
@@ -586,13 +606,74 @@ function markdownHtml(content) {
 function MarkdownPreview({ doc }) {
   const deferred = React.useDeferredValue(doc.content)
   const html = React.useMemo(() => markdownHtml(deferred), [deferred])
+  const ref = React.useRef(null)
+  React.useEffect(() => {
+    const node = ref.current
+    if (!node) return
+    const children = Array.from(node.children)
+    const anchor = Number(doc.anchorLine) || 1
+    if (anchor > 1) {
+      const target = children.find(child => {
+        const line = Number(child.dataset?.sourceLine)
+        return Number.isFinite(line) && line >= anchor
+      }) || children[children.length - 1]
+      if (target) {
+        const top = target.getBoundingClientRect().top - node.getBoundingClientRect().top + node.scrollTop
+        node.scrollTop = Math.max(0, top - 8)
+      }
+    } else {
+      node.scrollTop = Math.max(0, Number(doc.scrollTop) || 0)
+    }
+    const onScroll = () => {
+      setDocScroll(doc.id, node.scrollTop)
+      if (node.scrollTop <= 8) {
+        setDocAnchor(doc.id, 1)
+        return
+      }
+      let line = 1
+      for (const child of node.children) {
+        if (child.hidden) continue
+        const value = Number(child.dataset?.sourceLine)
+        if (!Number.isFinite(value)) continue
+        if (child.offsetTop <= node.scrollTop + 8) line = value
+        else break
+      }
+      setDocAnchor(doc.id, line)
+    }
+    node.addEventListener('scroll', onScroll, { passive: true })
+    return () => node.removeEventListener('scroll', onScroll)
+  }, [doc.id, doc.anchorLine])
+  const toggleFold = event => {
+    const button = event.target.closest?.('.np-md-fold')
+    if (!button) return
+    event.preventDefault()
+    event.stopPropagation()
+    const heading = button.closest('.np-md-heading')
+    if (!heading) return
+    const level = Number(heading.dataset.level) || 1
+    const collapsed = heading.classList.toggle('collapsed')
+    button.setAttribute('aria-expanded', String(!collapsed))
+    let node = heading.nextElementSibling
+    while (node) {
+      const nextLevel = node.classList?.contains('np-md-heading')
+        ? Number(node.dataset.level) || 1
+        : null
+      if (nextLevel !== null && nextLevel <= level) break
+      node.hidden = collapsed
+      node = node.nextElementSibling
+    }
+  }
   return h('div', {
+    ref,
     className: 'np-preview',
+    onClick: toggleFold,
+    onMouseDown: clearSelectionReady,
     onMouseUp: event => {
       const selection = window.getSelection()
       if (!selection || selection.isCollapsed) return
       if (!event.currentTarget.contains(selection.anchorNode)) return
       setPreviewSelection(selection.toString())
+      setTimeout(() => markSelectionReady(doc.id), 0)
     },
     dangerouslySetInnerHTML: { __html: html },
   })
@@ -634,6 +715,11 @@ function HtmlPreview({ doc }) {
     }
   }, [doc.content, doc.path, doc.dirty, doc.hash])
   React.useEffect(() => {
+    try {
+      frameRef.current?.contentWindow?.scrollTo(0, Math.max(0, Number(doc.scrollTop) || 0))
+    } catch {}
+  }, [doc.scrollTop, frameSrc, srcDoc, loading])
+  React.useEffect(() => {
     if (!imageMenu) return
     const close = event => {
       if (event.target?.closest?.('.np-image-menu')) return
@@ -650,7 +736,10 @@ function HtmlPreview({ doc }) {
   const capture = () => {
     try {
       const selection = frameRef.current?.contentWindow?.getSelection()
-      if (selection && !selection.isCollapsed) setPreviewSelection(selection.toString())
+      if (selection && !selection.isCollapsed) {
+        setPreviewSelection(selection.toString())
+        setTimeout(() => markSelectionReady(doc.id), 0)
+      }
     } catch {}
   }
   const copyImage = async src => {
@@ -686,10 +775,15 @@ function HtmlPreview({ doc }) {
     try {
       const target = frameRef.current?.contentDocument
       if (!target) return
+      target.addEventListener('mousedown', clearSelectionReady)
       target.addEventListener('mouseup', capture)
       target.addEventListener('keyup', capture)
       target.addEventListener('contextmenu', openImageMenu)
-      target.addEventListener('scroll', () => setImageMenu(null), true)
+      target.addEventListener('scroll', () => {
+        setImageMenu(null)
+        try { setDocScroll(doc.id, frameRef.current?.contentWindow?.scrollY || 0) } catch {}
+      }, true)
+      try { frameRef.current?.contentWindow?.scrollTo(0, Math.max(0, Number(doc.scrollTop) || 0)) } catch {}
     } catch {}
   }
   return h('div', { className: 'np-html-preview' },
@@ -809,7 +903,7 @@ export function EditorPane() {
               ? h(HtmlPreview, { doc })
               : h(MarkdownPreview, { doc }),
           )
-          : h(NotepadEditor, { doc }),
+          : h(NotepadEditor, { doc, key: doc.id }),
         h(FloatingBar, { doc }),
       ),
     ),
@@ -861,9 +955,10 @@ function NotepadAppInner() {
   sizeRef.current = state.settings.fontSize
   React.useEffect(() => {
     ensureInitialDoc()
-    loadHostStatus().then(() => {
+    loadHostStatus().then(async () => {
       loadFonts()
-      loadAutosaves()
+      await loadAutosaves()
+      await restoreSession()
     })
     const current = activeDoc()
     api('/client-report', {
@@ -1317,10 +1412,6 @@ function SettingsForm({ compact = false }) {
         h(Toggle, { checked: settings.wrap, onChange: value => set({ wrap: value }), label: '' }),
       ),
       h('div', { className: 'np-field' },
-        h('label', null, t('lineNumbers')),
-        h(Toggle, { checked: settings.lineNumbers, onChange: value => set({ lineNumbers: value }), label: '' }),
-      ),
-      h('div', { className: 'np-field' },
         h('label', { htmlFor: 'np-tab' }, t('tabSize')),
         h('input', { id: 'np-tab', className: 'np-input', type: 'number', min: 1, max: 8, value: settings.tabSize, onChange: event => set({ tabSize: Math.max(1, Math.min(8, Number(event.target.value) || 2)) }) }),
       ),
@@ -1416,7 +1507,7 @@ function AboutModal() {
   }, [])
 
   const platform = state.host?.platform === 'win32' ? 'Windows' : (state.host?.platform || '—')
-  const model = state.model ? `${state.model.provider} / ${state.model.model}` : '—'
+  const model = state.model ? `${state.model.provider}/${state.model.model}` : "—"
   const association = state.association
     ? (state.association.registered ? t('aboutAssocOn') : t('aboutAssocOff'))
     : '—'

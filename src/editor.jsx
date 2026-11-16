@@ -3,7 +3,6 @@ import { EditorState, Compartment } from '@codemirror/state'
 import {
   EditorView,
   keymap,
-  lineNumbers,
   highlightActiveLine,
   highlightActiveLineGutter,
   highlightSpecialChars,
@@ -21,7 +20,7 @@ import {
   redo,
 } from '@codemirror/commands'
 import { searchKeymap, highlightSelectionMatches, openSearchPanel } from '@codemirror/search'
-import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
+import { syntaxHighlighting, defaultHighlightStyle, foldGutter, foldService, foldKeymap } from '@codemirror/language'
 import { html } from '@codemirror/lang-html'
 import {
   activeDoc,
@@ -38,15 +37,52 @@ import {
   registerEditorBridge,
   clearEditorBridge,
   runAI,
+  markSelectionReady,
+  clearSelectionReady,
+  setDocScroll,
+  setDocAnchor,
 } from './store.js'
 
 const wrapCompartment = new Compartment()
-const lineNumberCompartment = new Compartment()
 const tabSizeCompartment = new Compartment()
 
 function languageFor(doc) {
   const name = String(doc?.name || doc?.path || '').toLowerCase()
   return /\.(html?|htm)$/.test(name) ? html() : []
+}
+
+function markdownHeadingFold(state, lineStart) {
+  const line = state.doc.lineAt(lineStart)
+  const match = /^(#{1,6})\s+\S/.exec(line.text)
+  if (!match) return null
+  const level = match[1].length
+  let end = state.doc.length
+  for (let number = line.number + 1; number <= state.doc.lines; number += 1) {
+    const next = state.doc.line(number)
+    const nextMatch = /^(#{1,6})\s+\S/.exec(next.text)
+    if (nextMatch && nextMatch[1].length <= level) {
+      end = next.from - 1
+      break
+    }
+  }
+  return end > line.to ? { from: line.to, to: end } : null
+}
+
+function foldMarker(open) {
+  const marker = document.createElement('span')
+  marker.className = 'np-fold-marker' + (open ? ' open' : ' closed')
+  marker.textContent = open ? '▾' : '▸'
+  marker.setAttribute('aria-hidden', 'true')
+  return marker
+}
+
+function markdownFolding(doc) {
+  if (previewKind(doc) !== 'markdown') return []
+  return [
+    foldGutter({ markerDOM: foldMarker }),
+    foldService.of(markdownHeadingFold),
+    keymap.of(foldKeymap),
+  ]
 }
 
 function createState(doc, settings) {
@@ -62,6 +98,7 @@ function createState(doc, settings) {
     highlightActiveLine(),
     highlightActiveLineGutter(),
     highlightSelectionMatches(),
+    markdownFolding(doc),
     placeholder(t('emptyHint')),
     keymap.of([
       { key: 'Mod-s', preventDefault: true, run: () => { saveDoc(); return true } },
@@ -89,9 +126,22 @@ function createState(doc, settings) {
       indentWithTab,
     ]),
     wrapCompartment.of(settings.wrap ? EditorView.lineWrapping : []),
-    lineNumberCompartment.of(settings.lineNumbers ? lineNumbers() : []),
     tabSizeCompartment.of(EditorState.tabSize.of(Number(settings.tabSize) || 2)),
     EditorView.domEventHandlers({
+      mousedown() {
+        clearSelectionReady()
+        return false
+      },
+      mouseup() {
+        setTimeout(() => markSelectionReady(), 0)
+        return false
+      },
+      keyup(event) {
+        if (event.shiftKey || event.key.startsWith('Arrow') || event.key === 'End' || event.key === 'Home') {
+          setTimeout(() => markSelectionReady(), 0)
+        }
+        return false
+      },
       contextmenu(event, view) {
         const selection = view.state.selection.main
         if (selection.empty) return false
@@ -163,7 +213,7 @@ function createState(doc, settings) {
 export function NotepadEditor({ doc }) {
   const hostRef = React.useRef(null)
   const viewRef = React.useRef(null)
-  const configuredRef = React.useRef({ wrap: true, lineNumbers: true, tabSize: 2 })
+  const configuredRef = React.useRef({ wrap: true, tabSize: 2 })
   const [, force] = React.useReducer(value => value + 1, 0)
 
   React.useEffect(() => {
@@ -172,9 +222,30 @@ export function NotepadEditor({ doc }) {
     const state = doc.cmState || createState(doc, getState().settings)
     const view = new EditorView({ state, parent: host })
     viewRef.current = view
+    const restorePosition = () => {
+      if (doc.cursor && Number.isFinite(Number(doc.cursor.line))) {
+        const lineNumber = Math.max(1, Math.min(view.state.doc.lines, Number(doc.cursor.line)))
+        const line = view.state.doc.line(lineNumber)
+        const anchor = line.from + Math.max(0, Math.min(line.length, (Number(doc.cursor.column) || 1) - 1))
+        view.dispatch({ selection: { anchor } })
+      }
+      if (Number(doc.anchorLine) > 1) {
+        const line = view.state.doc.line(Math.min(view.state.doc.lines, Number(doc.anchorLine)))
+        view.dispatch({ effects: EditorView.scrollIntoView(line.from, { y: 'start' }) })
+      } else {
+        view.scrollDOM.scrollTop = Math.max(0, Number(doc.scrollTop) || 0)
+      }
+    }
+    restorePosition()
+    const onScroll = () => {
+      const scrollTop = view.scrollDOM.scrollTop
+      setDocScroll(doc.id, scrollTop)
+      const block = view.lineBlockAtHeight(Math.min(scrollTop + 2, view.scrollDOM.scrollHeight))
+      setDocAnchor(doc.id, view.state.doc.lineAt(block.from).number)
+    }
+    view.scrollDOM.addEventListener('scroll', onScroll, { passive: true })
     configuredRef.current = {
       wrap: getState().settings.wrap,
-      lineNumbers: getState().settings.lineNumbers,
       tabSize: getState().settings.tabSize,
     }
     registerEditorBridge({
@@ -199,6 +270,7 @@ export function NotepadEditor({ doc }) {
     })
     force()
     return () => {
+      view.scrollDOM.removeEventListener('scroll', onScroll)
       clearEditorBridge()
       view.destroy()
       viewRef.current = null
@@ -220,13 +292,28 @@ export function NotepadEditor({ doc }) {
   React.useEffect(() => {
     const view = viewRef.current
     if (!view) return
+    if (Number(doc.anchorLine) > 1) {
+      const line = view.state.doc.line(Math.min(view.state.doc.lines, Number(doc.anchorLine)))
+      view.dispatch({ effects: EditorView.scrollIntoView(line.from, { y: 'start' }) })
+    } else {
+      const target = Math.max(0, Number(doc.scrollTop) || 0)
+      if (Math.abs(view.scrollDOM.scrollTop - target) > 1) view.scrollDOM.scrollTop = target
+    }
+    if (doc.cursor && Number.isFinite(Number(doc.cursor.line))) {
+      const lineNumber = Math.max(1, Math.min(view.state.doc.lines, Number(doc.cursor.line)))
+      const line = view.state.doc.line(lineNumber)
+      const anchor = line.from + Math.max(0, Math.min(line.length, (Number(doc.cursor.column) || 1) - 1))
+      if (view.state.selection.main.head !== anchor) view.dispatch({ selection: { anchor } })
+    }
+  }, [doc.scrollTop, doc.anchorLine])
+
+  React.useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
     const settings = getState().settings
     const effects = []
     if (configuredRef.current.wrap !== settings.wrap) {
       effects.push(wrapCompartment.reconfigure(settings.wrap ? EditorView.lineWrapping : []))
-    }
-    if (configuredRef.current.lineNumbers !== settings.lineNumbers) {
-      effects.push(lineNumberCompartment.reconfigure(settings.lineNumbers ? lineNumbers() : []))
     }
     if (configuredRef.current.tabSize !== settings.tabSize) {
       effects.push(tabSizeCompartment.reconfigure(EditorState.tabSize.of(Number(settings.tabSize) || 2)))
@@ -235,7 +322,6 @@ export function NotepadEditor({ doc }) {
       view.dispatch({ effects })
       configuredRef.current = {
         wrap: settings.wrap,
-        lineNumbers: settings.lineNumbers,
         tabSize: settings.tabSize,
       }
     }

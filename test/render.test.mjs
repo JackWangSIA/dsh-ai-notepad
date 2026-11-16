@@ -54,7 +54,9 @@ test('NotepadApp and settings page render without throwing', async () => {
   assert.doesNotMatch(review, /np-overlay/)
 
   const preview = module.renderPreview()
-  assert.match(preview, /<h1>Heading<\/h1>/)
+  assert.match(preview, /np-md-heading/)
+  assert.match(preview, /Heading/)
+  assert.match(preview, /np-md-fold/)
   assert.match(preview, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/)
   assert.doesNotMatch(preview, /<script>alert/)
 

@@ -116,6 +116,10 @@ export const CSS = `
 .np-editor-host .cm-content{padding:16px 0 60px;caret-color:var(--np-accent)}
 .np-editor-host .cm-line{padding:0 20px 0 12px;line-height:var(--np-line-height,1.65)}
 .np-editor-host .cm-gutters{background:var(--np-gutter);color:var(--np-text-3);border-right:1px solid var(--np-border);font-family:var(--np-mono);font-size:11.5px}
+.np-editor-host .cm-foldGutter{width:calc(var(--np-font-size,15px) + 8px)}
+.np-editor-host .cm-foldGutter .cm-gutterElement{display:flex;align-items:center;justify-content:center;width:calc(var(--np-font-size,15px) + 8px);padding:0;color:var(--np-text-3);cursor:pointer;overflow:visible}
+.np-editor-host .cm-foldGutter .cm-gutterElement:hover{color:var(--np-spark-strong);background:var(--np-panel-2)}
+.np-fold-marker{display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:calc(var(--np-font-size,15px) * 0.9);line-height:1;transform:translateY(1px)}
 .np-editor-host .cm-activeLineGutter{background:var(--np-panel-3);color:var(--np-text)}
 .np-editor-host .cm-activeLine{background:color-mix(in srgb,var(--np-panel-2) 55%,transparent)}
 .np-editor-host .cm-selectionBackground,.np-editor-host .cm-content ::selection{background:var(--np-selection)!important}
@@ -130,6 +134,15 @@ export const CSS = `
 .np-editor-host .cm-ann{background:color-mix(in srgb,var(--np-warn) 24%,transparent);border-bottom:1px dashed var(--np-warn)}
 .np-preview{position:absolute;inset:0;overflow:auto;padding:28px clamp(20px,6%,80px) 80px;background:var(--np-bg);color:var(--np-text);font-family:var(--np-font);font-size:calc(var(--np-font-size,15px) * var(--np-preview-scale,1.05));line-height:var(--np-line-height,1.65);font-weight:var(--np-editor-weight,400);user-select:text}
 .np-preview h1,.np-preview h2,.np-preview h3,.np-preview h4,.np-preview h5,.np-preview h6{line-height:1.3;margin:1.4em 0 .55em;font-weight:650}
+.np-preview .np-md-heading{position:relative;display:flex;align-items:center;gap:0;content-visibility:visible;contain-intrinsic-size:none}
+.np-preview .np-md-heading>span{flex:1;min-width:0}
+.np-md-fold{appearance:none;position:absolute;z-index:2;left:-1.25em;top:50%;transform:translateY(-50%);width:1em;height:1em;padding:0;border:0;border-radius:0;background:transparent;color:var(--np-text-2);font-size:.75em;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.np-md-fold::before{content:'▾';display:block;line-height:1}
+.np-preview .np-md-heading.collapsed .np-md-fold::before{content:'▸'}
+.np-md-fold:hover{color:var(--np-text);background:transparent}
+.np-md-fold:focus-visible{outline:2px solid var(--np-accent);outline-offset:2px}
+.np-preview .np-md-heading.collapsed .np-md-fold{color:var(--np-spark-strong);background:transparent}
+.np-preview [hidden]{display:none!important}
 .np-preview h1{font-size:1.9em;border-bottom:1px solid var(--np-border);padding-bottom:.35em}
 .np-preview h2{font-size:1.5em;border-bottom:1px solid var(--np-border);padding-bottom:.25em}
 .np-preview h3{font-size:1.25em}
@@ -154,6 +167,8 @@ export const CSS = `
 .np-statusbar .np-grow{flex:1}
 .np-status-item{display:inline-flex;align-items:center;gap:4px;overflow:hidden;text-overflow:ellipsis}
 .np-status-item b{font-weight:500;color:var(--np-text-2)}
+.np-selection-stat{padding:1px 7px;border:1px solid color-mix(in srgb,var(--np-spark) 42%,var(--np-border));border-radius:5px;background:var(--np-spark-soft);color:var(--np-spark-strong);white-space:nowrap}
+.np-selection-stat b{color:inherit;font-weight:650}
 .np-status-path{max-width:44vw;overflow:hidden;text-overflow:ellipsis;color:var(--np-text-3);direction:rtl;text-align:left}
 .np-badge{display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:999px;background:var(--np-panel-2);color:var(--np-text-2);font-size:10.5px}
 .np-badge.dirty{background:var(--np-warn-soft);color:var(--np-warn)}

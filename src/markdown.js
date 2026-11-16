@@ -63,6 +63,7 @@ export function renderMarkdown(source) {
   while (index < lines.length) {
     const line = lines[index]
     if (/^\s*$/.test(line)) { index++; continue }
+    const blockLine = index + 1
 
     const fence = line.match(/^\s*```([^\s`]*)\s*$/)
     if (fence) {
@@ -74,20 +75,24 @@ export function renderMarkdown(source) {
         index++
       }
       if (index < lines.length) index++
-      blocks.push('<pre class="np-md-code"' + (language ? ' data-lang="' + escapeHtml(language) + '"' : '') + '><code>' + escapeHtml(code.join('\n')) + '</code></pre>')
+      blocks.push('<pre class="np-md-code" data-source-line="' + blockLine + '"' + (language ? ' data-lang="' + escapeHtml(language) + '"' : '') + '><code>' + escapeHtml(code.join('\n')) + '</code></pre>')
       continue
     }
 
     const heading = line.match(/^\s*(#{1,6})\s+(.*?)\s*#*\s*$/)
     if (heading) {
       const level = heading[1].length
-      blocks.push('<h' + level + '>' + inline(heading[2]) + '</h' + level + '>')
+      blocks.push(
+        '<h' + level + ' class="np-md-heading" data-level="' + level + '" data-source-line="' + blockLine + '">' +
+        '<button type="button" class="np-md-fold" aria-label="折叠标题"></button>' +
+        '<span>' + inline(heading[2]) + '</span></h' + level + '>',
+      )
       index++
       continue
     }
 
     if (/^\s*(?:[-*_]\s*){3,}$/.test(line)) {
-      blocks.push('<hr>')
+      blocks.push('<hr data-source-line="' + blockLine + '">')
       index++
       continue
     }
@@ -98,7 +103,7 @@ export function renderMarkdown(source) {
         quote.push(lines[index].replace(/^\s*>\s?/, ''))
         index++
       }
-      blocks.push('<blockquote>' + renderMarkdown(quote.join('\n')) + '</blockquote>')
+      blocks.push('<blockquote data-source-line="' + blockLine + '">' + renderMarkdown(quote.join('\n')) + '</blockquote>')
       continue
     }
 
@@ -110,7 +115,7 @@ export function renderMarkdown(source) {
         rows.push(tableCells(lines[index]))
         index++
       }
-      let html = '<div class="np-md-tablewrap"><table><thead><tr>'
+      let html = '<div class="np-md-tablewrap" data-source-line="' + blockLine + '"><table><thead><tr>'
       html += head.map(cell => '<th>' + inline(cell) + '</th>').join('')
       html += '</tr></thead><tbody>'
       for (const row of rows) {
@@ -140,7 +145,7 @@ export function renderMarkdown(source) {
         index++
       }
       const tag = ordered ? 'ol' : 'ul'
-      let html = '<' + tag + '>'
+      let html = '<' + tag + ' data-source-line="' + blockLine + '">'
       for (const item of items) {
         html += '<li>' + (item.task !== null ? '<input type="checkbox" disabled' + (item.task ? ' checked' : '') + '> ' : '') + inline(item.text) + '</li>'
       }
@@ -151,13 +156,14 @@ export function renderMarkdown(source) {
 
     const paragraph = [line]
     index++
+    const paragraphLine = blockLine
     while (index < lines.length) {
       const next = lines[index]
       if (/^\s*$/.test(next) || /^\s*(#{1,6})\s+/.test(next) || /^\s*```/.test(next) || /^\s*>/.test(next) || /^(\s*)([-*+]|\d+[.)])\s+/.test(next) || /^\s*\|/.test(next)) break
       paragraph.push(next)
       index++
     }
-    blocks.push('<p>' + inline(paragraph.join('\n')).replace(/\n/g, '<br>') + '</p>')
+    blocks.push('<p data-source-line="' + paragraphLine + '">' + inline(paragraph.join('\n')).replace(/\n/g, '<br>') + '</p>')
   }
 
   return blocks.length ? blocks.join('\n') : '<p class="np-md-empty">没有可预览的 Markdown 内容</p>'

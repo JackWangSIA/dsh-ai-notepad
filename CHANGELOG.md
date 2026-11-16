@@ -2,6 +2,15 @@
 
 All notable changes to AI Notepad are documented here.
 
+## 1.3.1 — 2026-11-16
+
+- The floating selection AI card now waits until the selection gesture finishes instead of appearing during the drag.
+- Markdown headings can be folded in both the editor and the rendered preview. Fold markers are larger, vertically centered on the editor line, and the preview uses a bare triangle without a square button chrome.
+- Open files, active tab, Markdown preview state, cursor and scroll position are restored on the next start.
+- Switching between edit and preview keeps the document's last scroll/cursor position.
+- Removed editor line numbers; the gutter is now used only for Markdown heading folding.
+- The status bar shows selected characters, words, and line count when a selection exists.
+
 ## 1.3.0 — 2026-11-14
 
 - Refreshed the whole project introduction, README, market entry, and plugin metadata around the current editor experience.

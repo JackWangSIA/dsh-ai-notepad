@@ -253,6 +253,51 @@ test('accent color has a default and persists through settings', () => {
   assert.equal(store.getState().settings.accent, '#2fb3a6')
 })
 
+test('restoreSession reopens the last file at its remembered position', async () => {
+  const originalFetch = globalThis.fetch
+  const sessionKey = 'dsh.ai-notepad.session.v1'
+  const positionsKey = 'dsh.ai-notepad.positions.v1'
+  const filePath = 'C:\\temp\\session-test.md'
+  stored.set(sessionKey, JSON.stringify({
+    docs: [{ path: filePath, preview: false, cursor: { line: 4, column: 3 }, scrollTop: 120 }],
+    activePath: filePath,
+    at: Date.now(),
+  }))
+  globalThis.fetch = async url => {
+    if (String(url).endsWith('/read')) {
+      return new Response(JSON.stringify({
+        path: filePath,
+        name: 'session-test.md',
+        content: '# one\n\n# two\n\n# three',
+        encoding: 'utf-8',
+        bom: false,
+        eol: '\n',
+        hash: 'test',
+        size: 24,
+        mtimeMs: Date.now(),
+        readOnly: false,
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    }
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }
+  try {
+    store.getState().host = { platform: 'win32' }
+    store.getState().docs = []
+    store.getState().activeId = null
+    await store.restoreSession()
+    const doc = store.activeDoc()
+    assert.equal(doc?.name, 'session-test.md')
+    assert.equal(doc?.preview, false)
+    assert.deepEqual(doc?.cursor, { line: 4, column: 3 })
+    assert.equal(doc?.scrollTop, 120)
+  } finally {
+    store.getState().host = null
+    globalThis.fetch = originalFetch
+    stored.delete(sessionKey)
+    stored.delete(positionsKey)
+  }
+})
+
 test('dirty edits schedule an autosave request without keeping a second copy', async () => {
   const originalFetch = globalThis.fetch
   let autosaveBody = null
