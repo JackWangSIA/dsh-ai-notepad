@@ -22,6 +22,7 @@ import {
 import { searchKeymap, highlightSelectionMatches, openSearchPanel } from '@codemirror/search'
 import { syntaxHighlighting, defaultHighlightStyle, foldGutter, foldService, foldKeymap } from '@codemirror/language'
 import { html } from '@codemirror/lang-html'
+import { yaml } from '@codemirror/lang-yaml'
 import {
   activeDoc,
   closeDoc,
@@ -48,7 +49,9 @@ const tabSizeCompartment = new Compartment()
 
 function languageFor(doc) {
   const name = String(doc?.name || doc?.path || '').toLowerCase()
-  return /\.(html?|htm)$/.test(name) ? html() : []
+  if (/\.(html?|htm)$/.test(name)) return html()
+  if (/\.(ya?ml)$/.test(name)) return yaml()
+  return []
 }
 
 function markdownHeadingFold(state, lineStart) {

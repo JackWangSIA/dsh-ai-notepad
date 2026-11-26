@@ -322,3 +322,16 @@ test('VBS launcher writes a queue that the Host inbox consumes', async () => {
 test('GB18030 refuses unrepresentable characters instead of writing question marks', () => {
   assert.throws(() => encodeText('\uD800', 'gb18030'), error => error.code === 'unrepresentable')
 })
+
+test('opens YAML with control bytes as text instead of rejecting it', async () => {
+  const dir = await tempDir()
+  try {
+    const file = path.join(dir, 'config.yaml')
+    await fs.writeFile(file, Buffer.from([0x6e, 0x61, 0x6d, 0x65, 0x3a, 0x20, 0x01, 0x0a]))
+    const doc = await readDocument(file)
+    assert.equal(doc.encoding, 'utf-8')
+    assert.match(doc.content, /name:/)
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true })
+  }
+})

@@ -2,6 +2,20 @@
 
 All notable changes to AI Notepad are documented here.
 
+## 1.3.4 — 2026-11-26
+
+- Added YAML/YML syntax highlighting in the editor using CodeMirror's YAML language support: keys, strings, comments, numbers, booleans, anchors, tags, document markers, and list punctuation are highlighted.
+
+## 1.3.3 — 2026-11-26
+
+- YAML/YML files are treated as text even when they contain control characters or invalid UTF-8 bytes that the generic binary detector rejects.
+- File-association installation now makes unassociated extensions such as `.yaml`, `.yml`, `.json`, and `.toml` open with AI Notepad when Windows has no existing default, without overriding an existing default app.
+- Association status now reports a registered fallback/default correctly.
+
+## 1.3.2 — 2026-11-18
+
+- Markdown nested lists now render recursively. Four-space-indented bullets, ordered lists, mixed task items, and deeper levels produce properly nested `<ul>` / `<ol>` structures instead of a flat list.
+
 ## 1.3.1 — 2026-11-16
 
 - The floating selection AI card now waits until the selection gesture finishes instead of appearing during the drag.

@@ -55,6 +55,65 @@ function tableCells(line) {
   return value.split('|').map(cell => cell.trim())
 }
 
+const LIST_ITEM = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/
+
+function parseList(lines, start, baseIndent, ordered) {
+  const tag = ordered ? 'ol' : 'ul'
+  let index = start
+  let html = ''
+  while (index < lines.length) {
+    const match = lines[index].match(LIST_ITEM)
+    if (!match) break
+    const indent = match[1].length
+    const itemOrdered = /^\d/.test(match[2])
+    if (indent !== baseIndent || itemOrdered !== ordered) break
+    let text = match[3]
+    let task = null
+    const taskMatch = text.match(/^\[([ xX])\]\s+(.*)$/)
+    if (taskMatch) {
+      task = taskMatch[1].toLowerCase() === 'x'
+      text = taskMatch[2]
+    }
+    index += 1
+    let nested = ''
+    while (index < lines.length) {
+      const next = lines[index]
+      if (/^\s*$/.test(next)) {
+        let look = index
+        while (look < lines.length && /^\s*$/.test(lines[look])) look += 1
+        const afterBlank = lines[look] && lines[look].match(LIST_ITEM)
+        if (afterBlank && afterBlank[1].length > baseIndent) {
+          index = look
+          continue
+        }
+        break
+      }
+      const child = next.match(LIST_ITEM)
+      if (child && child[1].length > baseIndent) {
+        const childOrdered = /^\d/.test(child[2])
+        const parsed = parseList(lines, index, child[1].length, childOrdered)
+        nested += parsed.html
+        index = parsed.index
+        continue
+      }
+      if (child) break
+      const nextIndent = next.match(/^\s*/)[0].length
+      if (nextIndent > baseIndent && !/^\s*(?:[-*_]\s*){3,}$/.test(next)) {
+        text += '\n' + next.trim()
+        index += 1
+        continue
+      }
+      break
+    }
+    html += '<li>' +
+      (task !== null ? '<input type="checkbox" disabled' + (task ? ' checked' : '') + '> ' : '') +
+      inline(text).replace(/\n/g, '<br>') +
+      nested +
+      '</li>'
+  }
+  return { html: '<' + tag + '>' + html + '</' + tag + '>', index }
+}
+
 export function renderMarkdown(source) {
   const lines = String(source == null ? '' : source).replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
   const blocks = []
@@ -126,31 +185,12 @@ export function renderMarkdown(source) {
       continue
     }
 
-    const listMatch = line.match(/^(\s*)([-*+]|\d+[.)])\s+(.*)$/)
+    const listMatch = line.match(LIST_ITEM)
     if (listMatch) {
       const ordered = /^\d/.test(listMatch[2])
-      const baseIndent = listMatch[1].length
-      const items = []
-      while (index < lines.length) {
-        const match = lines[index].match(/^(\s*)([-*+]|\d+[.)])\s+(.*)$/)
-        if (!match || match[1].length < baseIndent || /^\d/.test(match[2]) !== ordered) break
-        let text = match[3]
-        let task = null
-        const taskMatch = text.match(/^\[([ xX])\]\s+(.*)$/)
-        if (taskMatch) {
-          task = taskMatch[1].toLowerCase() === 'x'
-          text = taskMatch[2]
-        }
-        items.push({ text, task })
-        index++
-      }
-      const tag = ordered ? 'ol' : 'ul'
-      let html = '<' + tag + ' data-source-line="' + blockLine + '">'
-      for (const item of items) {
-        html += '<li>' + (item.task !== null ? '<input type="checkbox" disabled' + (item.task ? ' checked' : '') + '> ' : '') + inline(item.text) + '</li>'
-      }
-      html += '</' + tag + '>'
-      blocks.push(html)
+      const parsed = parseList(lines, index, listMatch[1].length, ordered)
+      blocks.push(parsed.html.replace(/^<(ul|ol)/, '<$1 data-source-line="' + blockLine + '"'))
+      index = parsed.index
       continue
     }
 
